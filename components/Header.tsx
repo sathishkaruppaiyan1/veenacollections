@@ -30,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="cursor-pointer hover:text-white transition">US Dollar ▼</span>
           </div>
           <div className="flex items-center space-x-6">
-            <button className="flex items-center hover:text-white transition">
+            <button onClick={() => onNavigate('account', 'dashboard')} className="flex items-center hover:text-white transition">
               <User size={14} className="mr-1" />
               <span className="hidden sm:inline">My Account</span>
             </button>
@@ -78,28 +78,59 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             
-            {/* Logo */}
-            <div 
-              className="flex items-center justify-between lg:justify-start cursor-pointer"
-              onClick={() => onNavigate('home')}
-            >
-              <div className="flex items-center">
-                {siteLogo ? (
-                   <img src={siteLogo} alt={siteName} className="h-12 mr-3 object-contain" />
-                ) : (
-                  <div className="relative w-12 h-12 mr-3 border-2 border-white rounded-full flex items-center justify-center flex-shrink-0 bg-[#e31e24] text-white font-bold text-lg font-heading">
-                     VC
+            {/* Left Section: Logo & Desktop Menu */}
+            <div className="flex flex-col lg:flex-row lg:items-center gap-6 xl:gap-10">
+              {/* Logo */}
+              <div 
+                className="flex items-center justify-between lg:justify-start cursor-pointer"
+                onClick={() => onNavigate('home')}
+              >
+                <div className="flex items-center">
+                  {siteLogo ? (
+                     <img src={siteLogo} alt={siteName} className="h-12 mr-3 object-contain" />
+                  ) : (
+                    <div className="relative w-12 h-12 mr-3 border-2 border-white rounded-full flex items-center justify-center flex-shrink-0 bg-[#e31e24] text-white font-bold text-lg font-heading">
+                       VC
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-xl md:text-2xl font-bold text-white tracking-widest font-heading uppercase">{siteName}</h1>
+                    <p className="text-[10px] text-gray-400 tracking-[0.3em] uppercase">Traditional & Modern</p>
                   </div>
-                )}
-                <div>
-                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-widest font-heading uppercase">{siteName}</h1>
-                  <p className="text-[10px] text-gray-400 tracking-[0.3em] uppercase">Traditional & Modern</p>
                 </div>
               </div>
+
+              {/* Desktop Menu Links */}
+              <nav className="hidden lg:flex items-center space-x-6">
+                <button 
+                  onClick={() => onNavigate('home')} 
+                  className="text-white font-bold uppercase text-sm tracking-wide hover:text-[#e31e24] transition border-b-2 border-transparent hover:border-[#e31e24] pb-1"
+                >
+                  Home
+                </button>
+                <button 
+                  onClick={() => onNavigate('cart')} 
+                  className="text-white font-bold uppercase text-sm tracking-wide hover:text-[#e31e24] transition border-b-2 border-transparent hover:border-[#e31e24] pb-1"
+                >
+                  Cart
+                </button>
+                <button 
+                  onClick={() => onNavigate('page', 'contact')} 
+                  className="text-white font-bold uppercase text-sm tracking-wide hover:text-[#e31e24] transition border-b-2 border-transparent hover:border-[#e31e24] pb-1"
+                >
+                  Contact
+                </button>
+                <button 
+                  onClick={() => onNavigate('page', 'about-us')} 
+                  className="text-white font-bold uppercase text-sm tracking-wide hover:text-[#e31e24] transition border-b-2 border-transparent hover:border-[#e31e24] pb-1"
+                >
+                  About
+                </button>
+              </nav>
             </div>
 
-            {/* Search Bar & Burger Menu */}
-            <div className="flex items-center gap-3 w-full lg:w-auto lg:flex-1 lg:justify-end lg:max-w-2xl">
+            {/* Right Section: Search Bar & Burger Menu (Mobile Only) */}
+            <div className="flex items-center gap-3 w-full lg:w-auto lg:flex-1 lg:justify-end lg:max-w-md">
               {/* Search Bar */}
               <div className="relative flex-1">
                 <input 
@@ -110,10 +141,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <Search size={16} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-[#e31e24]" />
               </div>
 
-              {/* Burger Menu Button */}
+              {/* Burger Menu Button - HIDDEN on Desktop (lg:hidden) */}
               <button 
                 onClick={() => setIsMenuOpen(true)}
-                className="bg-[#e31e24] hover:bg-white hover:text-[#e31e24] text-white p-2.5 rounded transition duration-300 flex-shrink-0"
+                className="bg-[#e31e24] hover:bg-white hover:text-[#e31e24] text-white p-2.5 rounded transition duration-300 flex-shrink-0 lg:hidden"
                 aria-label="Open Menu"
               >
                 <Menu size={20} />
@@ -123,17 +154,14 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Sidebar Modal (Mobile & Desktop) */}
-      {/* Overlay */}
+      {/* Sidebar Modal (Mobile Only) */}
       <div 
         className={`fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setIsMenuOpen(false)}
       />
 
-      {/* Sidebar Panel */}
       <div className={`fixed top-0 right-0 z-[70] h-full w-[300px] max-w-[85vw] bg-white shadow-2xl transform transition-transform duration-300 ease-out ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
          
-         {/* Sidebar Header */}
          <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-[#0f1f2e] text-white">
             <span className="font-bold text-lg uppercase tracking-wider font-heading">Menu</span>
             <button 
@@ -144,10 +172,8 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
          </div>
 
-         {/* Sidebar Content */}
          <div className="overflow-y-auto h-[calc(100%-64px)] p-4">
             
-            {/* Search inside sidebar (optional, but handy) */}
             <div className="mb-6 lg:hidden">
                <div className="relative">
                  <input 
@@ -157,6 +183,16 @@ export const Header: React.FC<HeaderProps> = ({
                  />
                  <Search size={14} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                </div>
+            </div>
+
+            <div className="mb-6 border-b border-gray-100 pb-4">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Pages</h3>
+              <ul className="space-y-2">
+                <li onClick={() => { onNavigate('home'); setIsMenuOpen(false); }} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer font-semibold text-gray-700">Home</li>
+                <li onClick={() => { onNavigate('cart'); setIsMenuOpen(false); }} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer font-semibold text-gray-700">Cart</li>
+                <li onClick={() => { onNavigate('page', 'contact'); setIsMenuOpen(false); }} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer font-semibold text-gray-700">Contact</li>
+                <li onClick={() => { onNavigate('page', 'about-us'); setIsMenuOpen(false); }} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer font-semibold text-gray-700">About</li>
+              </ul>
             </div>
 
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Categories</h3>
@@ -172,7 +208,6 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 </li>
               ))}
-              {/* Fallback items if menu is empty */}
               {menuItems.length === 0 && ['Men', 'Women', 'Accessories', 'Watches', 'Jewelry'].map((item, idx) => (
                  <li key={idx}>
                     <div onClick={() => { onNavigate('shop'); setIsMenuOpen(false); }} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 cursor-pointer group transition">
