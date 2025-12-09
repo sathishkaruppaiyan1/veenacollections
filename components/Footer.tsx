@@ -57,6 +57,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('account', 'addresses')}>› Addresses</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('cart')}>› Shopping Cart</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('wishlist')}>› Wishlist</li>
+                <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('track-order')}>› Track Your Order</li>
               </ul>
             </div>
           </div>

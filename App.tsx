@@ -5,9 +5,175 @@ import { ProductCard } from './components/ProductCard';
 import { Sidebar } from './components/Sidebar';
 import { api } from './api';
 import { Product, ViewState, CartItem, Category, NavItem, Variation, Order } from './types';
-import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Grid, List, Star, ShoppingCart, Heart, Loader2, User, Package, MapPin, LogOut, CreditCard } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Grid, List, Star, ShoppingCart, Heart, Loader2, User, Package, MapPin, LogOut, CreditCard, Quote } from 'lucide-react';
 
 const DEFAULT_LOGO = "https://khaki-sparrow-300023.hostingersite.com/wp-content/uploads/2025/11/Blue-White-Modern-Minimalist-Name-Logo-2.png";
+
+interface DealProps {
+  onNavigate: (view: any) => void;
+  products: Product[];
+  onProductClick: (id: number) => void;
+  onAddToCart: (p: Product) => void;
+  onToggleWishlist: (p: Product) => void;
+  isInWishlist: (id: number) => boolean;
+}
+
+const DealOfTheDay = ({ onNavigate, products, onProductClick, onAddToCart, onToggleWishlist, isInWishlist }: DealProps) => {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    // Set a target date 2 days from now for demo purposes
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 2); 
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const difference = targetDate.getTime() - now.getTime();
+
+      if (difference > 0) {
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+        const minutes = Math.floor((difference / 1000 / 60) % 60);
+        const seconds = Math.floor((difference / 1000) % 60);
+        setTimeLeft({ days, hours, minutes, seconds });
+      } else {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="bg-[#e31e24] py-12 md:py-16 text-white overflow-hidden relative mb-16">
+      {/* Background Image updated to Saree/Texture */}
+      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-center opacity-25"></div>
+      <div className="container mx-auto px-4 relative z-10">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-10 mb-12">
+           <div className="lg:w-1/2 text-center lg:text-left">
+              <h3 className="text-lg font-bold uppercase mb-2 tracking-widest text-white/80">Don't Miss Out</h3>
+              <h2 className="text-4xl md:text-5xl font-bold font-heading mb-6 uppercase">Deal of the Day</h2>
+              <p className="mb-8 max-w-lg mx-auto lg:mx-0 text-lg text-white/90">Get up to 50% off on our exclusive traditional saree and jewelry collection. Limited time offer!</p>
+              <button 
+                onClick={() => onNavigate('shop')}
+                className="bg-white text-[#e31e24] px-10 py-3.5 font-bold uppercase hover:bg-black hover:text-white transition shadow-lg text-sm tracking-widest"
+              >
+                Shop The Deal
+              </button>
+           </div>
+           <div className="lg:w-1/2 flex justify-center gap-3 md:gap-6">
+              <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-white/20">
+                 <span className="text-3xl md:text-4xl font-bold">{timeLeft.days}</span>
+                 <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Days</span>
+              </div>
+               <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-white/20">
+                 <span className="text-3xl md:text-4xl font-bold">{timeLeft.hours}</span>
+                 <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Hours</span>
+              </div>
+               <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-white/20">
+                 <span className="text-3xl md:text-4xl font-bold">{timeLeft.minutes}</span>
+                 <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Mins</span>
+              </div>
+               <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-white/20">
+                 <span className="text-3xl md:text-4xl font-bold">{timeLeft.seconds}</span>
+                 <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Secs</span>
+              </div>
+           </div>
+        </div>
+
+        {/* Products Grid Below Timer */}
+        {products.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-8 border-t border-white/20">
+            {products.slice(0, 3).map(product => (
+              <ProductCard 
+                key={product.id} 
+                product={product} 
+                onClick={onProductClick} 
+                onAddToCart={onAddToCart} 
+                onToggleWishlist={onToggleWishlist}
+                isWishlisted={isInWishlist(product.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const CustomerReviews = () => {
+  const reviews = [
+    {
+      id: 1,
+      name: "Sarah Johnson",
+      rating: 5,
+      text: "Absolutely stunning saree! The craftsmanship is incredible and it looks even better in person. Fast shipping too.",
+      role: "Verified Buyer"
+    },
+    {
+      id: 2,
+      name: "Michael Chen",
+      rating: 4,
+      text: "Great quality for the price. The fabric is very comfortable. Would definitely recommend Veena Collections.",
+      role: "Regular Customer"
+    },
+    {
+      id: 3,
+      name: "Emily Davis",
+      rating: 5,
+      text: "I bought the silver jewelry set for my sister and she loves it. The packaging was beautiful and premium.",
+      role: "Verified Buyer"
+    }
+  ];
+
+  const [currentReview, setCurrentReview] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentReview(prev => (prev + 1) % reviews.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [reviews.length]);
+
+  return (
+    <div className="bg-[#f9f9f9] py-16 border-t border-gray-200">
+      <div className="container mx-auto px-4 text-center">
+         <div className="text-center mb-10">
+            <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Customer Reviews</h3>
+            <div className="w-12 h-0.5 bg-[#e31e24] mx-auto mt-4"></div>
+         </div>
+
+         <div className="max-w-4xl mx-auto relative bg-white p-8 md:p-12 shadow-sm rounded-sm">
+           <Quote size={48} className="text-[#e31e24]/10 absolute top-4 left-4" />
+           <Quote size={48} className="text-[#e31e24]/10 absolute bottom-4 right-4 transform rotate-180" />
+           
+           <div className="relative min-h-[180px] flex flex-col justify-center items-center transition-all duration-500">
+             <div className="flex mb-4 text-[#e31e24]">
+               {[...Array(5)].map((_, i) => (
+                 <Star key={i} size={20} fill={i < reviews[currentReview].rating ? "currentColor" : "none"} stroke="currentColor" className={i < reviews[currentReview].rating ? "" : "text-gray-300"} />
+               ))}
+             </div>
+             <p className="text-gray-600 text-lg md:text-xl italic mb-6 leading-relaxed">"{reviews[currentReview].text}"</p>
+             <div>
+               <h4 className="font-bold text-gray-800 uppercase tracking-wide">{reviews[currentReview].name}</h4>
+               <span className="text-xs text-gray-500">{reviews[currentReview].role}</span>
+             </div>
+           </div>
+
+           <div className="flex justify-center gap-2 mt-8">
+             {reviews.map((_, idx) => (
+               <button 
+                 key={idx} 
+                 onClick={() => setCurrentReview(idx)}
+                 className={`w-3 h-3 rounded-full transition-all duration-300 ${idx === currentReview ? 'bg-[#e31e24] w-6' : 'bg-gray-300 hover:bg-gray-400'}`}
+               />
+             ))}
+           </div>
+         </div>
+      </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('home');
@@ -494,6 +660,122 @@ const App: React.FC = () => {
     );
   };
 
+  const TrackOrderView = () => {
+    const [orderId, setOrderId] = useState('');
+    const [billingEmail, setBillingEmail] = useState('');
+    const [trackingResult, setTrackingResult] = useState<Order | null>(null);
+    const [trackingError, setTrackingError] = useState('');
+    const [isTracking, setIsTracking] = useState(false);
+
+    const handleTrack = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsTracking(true);
+      setTrackingError('');
+      setTrackingResult(null);
+
+      try {
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Mock finding an order from the API.orders mock data
+        const orders = await api.getOrders();
+        const found = orders.find(o => o.id.toString() === orderId);
+
+        if (found) {
+          setTrackingResult(found);
+        } else {
+          setTrackingError(`Could not find order #${orderId}. Please check the Order ID and try again.`);
+        }
+      } catch (err) {
+         setTrackingError("An error occurred while tracking. Please try again.");
+      } finally {
+        setIsTracking(false);
+      }
+    };
+
+    return (
+      <div className="container mx-auto px-4 py-12">
+         <h1 className="text-2xl font-bold uppercase font-heading text-gray-800 mb-8 border-b pb-4">Track Order</h1>
+         
+         <div className="max-w-2xl mx-auto bg-white p-8 shadow-sm border border-gray-100">
+            <p className="text-gray-600 mb-6">
+              To track your order please enter your Order ID in the box below and press the "Track" button. 
+              This was given to you on your receipt and in the confirmation email you should have received.
+            </p>
+            
+            <form onSubmit={handleTrack} className="space-y-6">
+               <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Order ID</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={orderId}
+                    onChange={(e) => setOrderId(e.target.value)}
+                    className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#f10044]" 
+                    placeholder="Found in your order confirmation email."
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Try using ID <strong>1024</strong> or <strong>998</strong> for this demo.</p>
+               </div>
+               <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Billing Email</label>
+                  <input 
+                    type="email" 
+                    required 
+                    value={billingEmail}
+                    onChange={(e) => setBillingEmail(e.target.value)}
+                    className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#f10044]" 
+                    placeholder="Email you used during checkout."
+                  />
+               </div>
+               <button 
+                 type="submit" 
+                 disabled={isTracking}
+                 className="bg-[#f10044] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm disabled:opacity-50 flex items-center"
+               >
+                 {isTracking ? <><Loader2 className="animate-spin mr-2" size={16} /> Tracking...</> : 'Track'}
+               </button>
+            </form>
+
+            {trackingError && (
+               <div className="mt-8 p-4 bg-red-50 text-red-700 text-sm rounded border border-red-100 flex items-center">
+                 <X size={16} className="mr-2" /> {trackingError}
+               </div>
+            )}
+
+            {trackingResult && (
+               <div className="mt-8 border-t border-gray-200 pt-8 animate-fade-in-up">
+                 <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                   <Check size={20} className="text-green-600 mr-2" /> Order #{trackingResult.id} Found
+                 </h3>
+                 <div className="bg-gray-50 p-6 rounded text-sm space-y-3">
+                    <div className="flex justify-between">
+                       <span className="text-gray-600">Status:</span>
+                       <span className="font-bold uppercase text-[#f10044]">{trackingResult.status}</span>
+                    </div>
+                    <div className="flex justify-between">
+                       <span className="text-gray-600">Date:</span>
+                       <span className="font-bold">{new Date(trackingResult.date_created).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                       <span className="text-gray-600">Total:</span>
+                       <span className="font-bold">${trackingResult.total}</span>
+                    </div>
+                    <div className="pt-4 border-t border-gray-200 mt-4">
+                       <p className="font-bold text-gray-700 mb-2">Items:</p>
+                       <ul className="list-disc pl-5 text-gray-600 space-y-1">
+                          {trackingResult.line_items.map((item, idx) => (
+                             <li key={idx}>{item.quantity} x {item.name}</li>
+                          ))}
+                       </ul>
+                    </div>
+                 </div>
+               </div>
+            )}
+         </div>
+      </div>
+    );
+  };
+
   const HomeView = () => {
     const slides = [
       {
@@ -528,10 +810,13 @@ const App: React.FC = () => {
       return () => clearInterval(timer);
     }, []);
 
+    // Helper to get Best Sellers (using reverse of products for demo variety)
+    const bestSellers = [...products].reverse().slice(0, 4);
+
     return (
     <>
       {/* Hero Slider */}
-      <div className="relative h-[500px] w-full bg-[#111] overflow-hidden">
+      <div className="relative h-[500px] w-full bg-[#111] overflow-hidden mb-12">
         {slides.map((slide, index) => (
           <div 
             key={slide.id}
@@ -573,17 +858,15 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Welcome Section */}
-      <div className="container mx-auto px-4 py-12">
-        <div className="bg-white border border-gray-200 p-8 text-center shadow-sm">
-          <h2 className="text-xl font-bold uppercase mb-4 text-gray-800 tracking-wide">Welcome to our store</h2>
-          <div className="w-16 h-1 bg-[#f10044] mx-auto mb-6"></div>
-          <p className="text-gray-500 text-sm leading-relaxed max-w-3xl mx-auto">
-            Discover our exclusive collection of premium sarees and luxury accessories. 
-            From traditional silk weaves to contemporary designer jewelry, we bring you the finest craftsmanship.
-          </p>
-        </div>
-      </div>
+      {/* Deal of the Day (Replaces Welcome Section) */}
+      <DealOfTheDay 
+        onNavigate={handleNavigate} 
+        products={products}
+        onProductClick={handleProductClick}
+        onAddToCart={addToCart}
+        onToggleWishlist={toggleWishlist}
+        isInWishlist={isInWishlist}
+      />
 
       {/* Categories Grid */}
       <div className="container mx-auto px-4 mb-16">
@@ -616,7 +899,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Featured Products */}
-      <div className="bg-[#f6f6f6] py-16">
+      <div className="bg-[#f6f6f6] py-16 mb-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-10">
             <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Featured Products</h3>
@@ -639,6 +922,31 @@ const App: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Best Sellers */}
+      <div className="container mx-auto px-4 mb-16">
+        <div className="text-center mb-10">
+          <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Best Sellers</h3>
+          <div className="w-12 h-0.5 bg-[#f10044] mx-auto mt-4"></div>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+           {bestSellers.map(product => (
+             <ProductCard 
+               key={product.id} 
+               product={product} 
+               onClick={handleProductClick} 
+               onAddToCart={addToCart} 
+               onToggleWishlist={toggleWishlist}
+               isWishlisted={isInWishlist(product.id)}
+             />
+           ))}
+        </div>
+      </div>
+
+      {/* Customer Reviews */}
+      <CustomerReviews />
+
     </>
     );
   };
@@ -1043,6 +1351,7 @@ const App: React.FC = () => {
         {view === 'register' && <RegisterView />}
         {view === 'account' && <AccountView />}
         {view === 'page' && <PageView />}
+        {view === 'track-order' && <TrackOrderView />}
       </main>
 
       <Footer onNavigate={handleNavigate} />

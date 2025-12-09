@@ -48,7 +48,7 @@ export interface Order {
   line_items: Array<{ name: string; quantity: number; total: string }>;
 }
 
-export type ViewState = 'home' | 'shop' | 'product' | 'cart' | 'wishlist' | 'register' | 'account' | 'page' | 'checkout';
+export type ViewState = 'home' | 'shop' | 'product' | 'cart' | 'wishlist' | 'register' | 'account' | 'page' | 'checkout' | 'track-order';
 
 export interface Category {
   id: number;

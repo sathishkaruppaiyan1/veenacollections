@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Heart, User, Search, Lock, Menu, X, ChevronRight } from 'lucide-react';
+import { ShoppingCart, Heart, User, Search, Lock, Menu, X, ChevronRight, Truck } from 'lucide-react';
 import { NavItem } from '../types';
 
 interface HeaderProps {
@@ -30,6 +30,13 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="cursor-pointer hover:text-white transition">US Dollar ▼</span>
           </div>
           <div className="flex items-center space-x-6">
+            <button 
+              onClick={() => onNavigate('track-order')}
+              className="flex items-center hover:text-white transition"
+            >
+              <Truck size={14} className="mr-1" />
+              <span className="hidden sm:inline">Track Your Order</span>
+            </button>
             <button onClick={() => onNavigate('account', 'dashboard')} className="flex items-center hover:text-white transition">
               <User size={14} className="mr-1" />
               <span className="hidden sm:inline">My Account</span>
@@ -223,6 +230,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <li onClick={() => { onNavigate('account', 'dashboard'); setIsMenuOpen(false); }} className="cursor-pointer hover:text-[#e31e24] flex items-center"><User size={14} className="mr-2"/> Dashboard</li>
                   <li onClick={() => { onNavigate('account', 'orders'); setIsMenuOpen(false); }} className="cursor-pointer hover:text-[#e31e24] flex items-center"><ShoppingCart size={14} className="mr-2"/> Orders</li>
                   <li onClick={() => { onNavigate('wishlist'); setIsMenuOpen(false); }} className="cursor-pointer hover:text-[#e31e24] flex items-center"><Heart size={14} className="mr-2"/> Wishlist</li>
+                  <li onClick={() => { onNavigate('track-order'); setIsMenuOpen(false); }} className="cursor-pointer hover:text-[#e31e24] flex items-center"><Truck size={14} className="mr-2"/> Track Order</li>
                </ul>
             </div>
          </div>
