@@ -1323,7 +1323,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white text-gray-500 flex-col">
         <Loader2 size={48} className="animate-spin text-[#f10044] mb-4" />
-        <p className="uppercase tracking-widest text-xs font-bold">Loading Wrist Wear...</p>
+        <p className="uppercase tracking-widest text-xs font-bold">Loading Veena Collections...</p>
       </div>
     );
   }

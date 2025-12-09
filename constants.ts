@@ -9,7 +9,7 @@ export const MOCK_PRODUCTS: Product[] = [
     rating: 4,
     image: "https://picsum.photos/id/175/600/600",
     category: "Men",
-    sku: "WW-001",
+    sku: "VC-001",
     type: 'simple',
     attributes: []
   },
@@ -21,7 +21,7 @@ export const MOCK_PRODUCTS: Product[] = [
     rating: 5,
     image: "https://picsum.photos/id/119/600/600",
     category: "Pocket",
-    sku: "WW-002",
+    sku: "VC-002",
     type: 'simple',
     attributes: []
   },
@@ -32,7 +32,7 @@ export const MOCK_PRODUCTS: Product[] = [
     rating: 5,
     image: "https://picsum.photos/id/22/600/600",
     category: "Women",
-    sku: "WW-003",
+    sku: "VC-003",
     type: 'simple',
     attributes: []
   },
@@ -44,7 +44,7 @@ export const MOCK_PRODUCTS: Product[] = [
     rating: 3,
     image: "https://picsum.photos/id/36/600/600",
     category: "Women",
-    sku: "WW-004",
+    sku: "VC-004",
     type: 'simple',
     attributes: []
   },
@@ -56,7 +56,7 @@ export const MOCK_PRODUCTS: Product[] = [
     rating: 4,
     image: "https://picsum.photos/id/60/600/600",
     category: "Accessories",
-    sku: "WW-005",
+    sku: "VC-005",
     type: 'simple',
     attributes: []
   },
@@ -67,7 +67,7 @@ export const MOCK_PRODUCTS: Product[] = [
     rating: 5,
     image: "https://picsum.photos/id/96/600/600",
     category: "Women",
-    sku: "WW-006",
+    sku: "VC-006",
     type: 'simple',
     attributes: []
   }
