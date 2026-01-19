@@ -31,6 +31,7 @@ export interface Product {
   category: string;
   type: string; // 'simple', 'variable', etc.
   attributes: ProductAttribute[];
+  date_created: string;
 }
 
 export interface CartItem extends Product {
@@ -48,7 +49,7 @@ export interface Order {
   line_items: Array<{ name: string; quantity: number; total: string }>;
 }
 
-export type ViewState = 'home' | 'shop' | 'product' | 'cart' | 'wishlist' | 'register' | 'account' | 'page' | 'checkout' | 'track-order';
+export type ViewState = 'home' | 'shop' | 'product' | 'cart' | 'wishlist' | 'register' | 'account' | 'page' | 'checkout' | 'track-order' | 'categories' | 'deal' | 'rent' | 'cookie-policy';
 
 export interface Category {
   id: number;

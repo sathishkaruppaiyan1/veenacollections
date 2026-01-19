@@ -26,9 +26,9 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <h3 className="text-xl font-bold uppercase tracking-wide">Newsletter</h3>
           </div>
           <div className="flex-1 max-w-xl mx-auto flex w-full md:px-8">
-             <input 
-              type="email" 
-              placeholder="Enter your email here..." 
+            <input
+              type="email"
+              placeholder="Enter your email here..."
               className="flex-1 px-4 py-2 text-gray-800 text-sm focus:outline-none rounded-l-sm"
             />
             <button className="bg-white text-[#e31e24] font-bold px-6 py-2 text-sm uppercase rounded-r-sm flex items-center hover:bg-gray-100 transition">
@@ -43,7 +43,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 lg:gap-8 text-sm">
           {/* Widget 1 - My Account */}
           <div className="border-b border-gray-800 lg:border-none">
-            <h4 
+            <h4
               className="font-bold text-lg py-4 lg:py-0 lg:mb-6 flex items-center justify-between cursor-pointer lg:cursor-default"
               onClick={() => toggleSection('account')}
             >
@@ -64,7 +64,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
           {/* Widget 2 - Customer Service */}
           <div className="border-b border-gray-800 lg:border-none">
-            <h4 
+            <h4
               className="font-bold text-lg py-4 lg:py-0 lg:mb-6 flex items-center justify-between cursor-pointer lg:cursor-default"
               onClick={() => toggleSection('service')}
             >
@@ -73,18 +73,16 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </h4>
             <div className={`overflow-hidden transition-all duration-300 ease-in-out ${openSections['service'] ? 'max-h-[300px] opacity-100 mb-4' : 'max-h-0 opacity-0 lg:max-h-full lg:opacity-100 lg:mb-0'}`}>
               <ul className="space-y-3 text-gray-400">
-                <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'sitemap')}>› Sitemap</li>
-                <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('shop')}>› Recently Viewed Products</li>
-                <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('shop')}>› Compare Products List</li>
-                <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('shop')}>› New Products</li>
+                <li className="hover:text-[#e31e24] transition text-gray-400">Email: theveenacollections@gmail.com</li>
+                <li className="hover:text-[#e31e24] transition text-gray-400">Whatsapp: (909) 913-2080 only</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'contact')}>› Contact Us</li>
               </ul>
             </div>
           </div>
 
-           {/* Widget 3 - Information */}
-           <div className="border-b border-gray-800 lg:border-none">
-            <h4 
+          {/* Widget 3 - Information */}
+          <div className="border-b border-gray-800 lg:border-none">
+            <h4
               className="font-bold text-lg py-4 lg:py-0 lg:mb-6 flex items-center justify-between cursor-pointer lg:cursor-default"
               onClick={() => toggleSection('info')}
             >
@@ -96,6 +94,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'shipping-policy')}>› Shipping Policy</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'refund_returns')}>› Refunds & Returns</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'privacy-policy')}>› Privacy Policy</li>
+                <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('cookie-policy')}>› Cookie Policy</li>
+                <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('cookie-policy')}>› Do Not Sell My Info</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'about-us')}>› About Us</li>
               </ul>
             </div>
@@ -103,7 +103,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
           {/* Widget 4 - Socials & Payments */}
           <div className="border-b border-gray-800 lg:border-none">
-            <h4 
+            <h4
               className="font-bold text-lg py-4 lg:py-0 lg:mb-6 flex items-center justify-between cursor-pointer lg:cursor-default"
               onClick={() => toggleSection('follow')}
             >

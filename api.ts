@@ -7,8 +7,8 @@ import { Product, Category, NavItem, Variation, Order } from './types';
 // ==========================================
 const WP_CONFIG = {
   // Your WordPress Site URL (no trailing slash)
-  SITE_URL: 'https://khaki-sparrow-300023.hostingersite.com', 
-  
+  SITE_URL: 'https://khaki-sparrow-300023.hostingersite.com',
+
   // WooCommerce REST API Keys (WooCommerce > Settings > Advanced > REST API)
   // WARNING: In a production app, never expose secrets in frontend code. Use a proxy server.
   CONSUMER_KEY: 'ck_ed8e1befbb8cf9af9aa37bb25bc53460f9dad126',
@@ -58,7 +58,8 @@ export const api = {
         category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
         sku: item.sku,
         type: item.type,
-        attributes: item.attributes || []
+        attributes: item.attributes || [],
+        date_created: item.date_created
       }));
 
     } catch (error) {
@@ -67,14 +68,42 @@ export const api = {
     }
   },
 
+  searchProducts: async (query: string): Promise<Product[]> => {
+    try {
+      if (!query) return [];
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        return MOCK_PRODUCTS.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      }
+
+      const response = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&search=${encodeURIComponent(query)}&per_page=5`);
+      const data = await handleResponse(response);
+
+      return data.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        price: parseFloat(item.price || 0),
+        oldPrice: item.regular_price && item.sale_price ? parseFloat(item.regular_price) : undefined,
+        rating: Math.round(parseFloat(item.average_rating)) || 0,
+        image: item.images && item.images.length > 0 ? item.images[0].src : 'https://placehold.co/600x600?text=No+Image',
+        category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+        sku: item.sku,
+        type: item.type,
+        attributes: item.attributes || []
+      }));
+    } catch (error) {
+      console.error("Search failed:", error);
+      return [];
+    }
+  },
+
   // -----------------------------------------------------------
   // 2. Fetch Categories from WooCommerce
   // -----------------------------------------------------------
   getCategories: async (): Promise<Category[]> => {
     try {
-       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return CATEGORIES;
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return CATEGORIES;
 
-      const response = await fetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=true&per_page=4`);
+      const response = await fetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=true&per_page=100`);
       const data = await handleResponse(response);
 
       return data.map((item: any) => ({
@@ -101,7 +130,7 @@ export const api = {
     try {
       // Attempt 1: Try WP REST API Menus endpoint
       const response = await fetch(`${API_BASE}/menus/v1/menus/${slug}`);
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data && data.items) {
@@ -124,13 +153,13 @@ export const api = {
       if (catResponse.ok) {
         const data = await catResponse.json();
         return data.map((cat: any) => ({
-           id: `cat-${cat.id}`,
-           label: cat.name,
-           hasSubmenu: false 
+          id: `cat-${cat.id}`,
+          label: cat.name,
+          hasSubmenu: false
         }));
       }
     } catch (error) {
-       console.error("Failed to fetch categories for menu fallback:", error);
+      console.error("Failed to fetch categories for menu fallback:", error);
     }
 
     // Attempt 3: Static Fallback
@@ -142,22 +171,47 @@ export const api = {
   // -----------------------------------------------------------
   getProductVariations: async (productId: number): Promise<Variation[]> => {
     try {
-       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return [];
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return [];
 
-       const response = await fetch(`${API_BASE}/wc/v3/products/${productId}/variations?${getAuthParams()}`);
-       const data = await handleResponse(response);
+      const response = await fetch(`${API_BASE}/wc/v3/products/${productId}/variations?${getAuthParams()}`);
+      const data = await handleResponse(response);
 
-       return data.map((v: any) => ({
-         id: v.id,
-         price: parseFloat(v.price),
-         regular_price: v.regular_price ? parseFloat(v.regular_price) : undefined,
-         sale_price: v.sale_price ? parseFloat(v.sale_price) : undefined,
-         image: v.image,
-         attributes: v.attributes
-       }));
+      return data.map((v: any) => ({
+        id: v.id,
+        price: parseFloat(v.price),
+        regular_price: v.regular_price ? parseFloat(v.regular_price) : undefined,
+        sale_price: v.sale_price ? parseFloat(v.sale_price) : undefined,
+        image: v.image,
+        attributes: v.attributes
+      }));
     } catch (error) {
-       console.error("Failed to fetch variations:", error);
-       return [];
+      console.error("Failed to fetch variations:", error);
+      return [];
+    }
+  },
+
+  // -----------------------------------------------------------
+  // 5. Fetch Attributes & Terms
+  // -----------------------------------------------------------
+  getAttributes: async (): Promise<any[]> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return [];
+      const response = await fetch(`${API_BASE}/wc/v3/products/attributes?${getAuthParams()}`);
+      return await handleResponse(response);
+    } catch (error) {
+      console.error("Failed to fetch attributes:", error);
+      return [];
+    }
+  },
+
+  getAttributeTerms: async (attributeId: number): Promise<any[]> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return [];
+      const response = await fetch(`${API_BASE}/wc/v3/products/attributes/${attributeId}/terms?${getAuthParams()}&per_page=100`);
+      return await handleResponse(response);
+    } catch (error) {
+      console.error(`Failed to fetch terms for attribute ${attributeId}:`, error);
+      return [];
     }
   },
 
@@ -167,14 +221,14 @@ export const api = {
   getSiteInfo: async (): Promise<{ name: string; description: string }> => {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
-          return { name: 'VEENA COLLECTIONS', description: 'Traditional & Modern' };
+        return { name: 'VEENA COLLECTIONS', description: 'Traditional & Modern' };
       }
-      
+
       const response = await fetch(API_BASE); // Public index usually returns site info
       const data = await response.json();
-      return { 
-          name: data.name || 'VEENA COLLECTIONS', 
-          description: data.description || 'Traditional & Modern' 
+      return {
+        name: data.name || 'VEENA COLLECTIONS',
+        description: data.description || 'Traditional & Modern'
       };
     } catch (error) {
       console.error("Failed to fetch site info:", error);
@@ -187,26 +241,26 @@ export const api = {
   // -----------------------------------------------------------
   getSiteLogo: async (): Promise<string | null> => {
     try {
-       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return null;
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return null;
 
-       const response = await fetch(`${API_BASE}/wp/v2/settings?${getAuthParams()}`);
-       
-       if (response.ok) {
-           const settings = await response.json();
-           const logoId = settings.site_logo;
-           
-           if (logoId) {
-               const mediaResponse = await fetch(`${API_BASE}/wp/v2/media/${logoId}`);
-               if (mediaResponse.ok) {
-                   const media = await mediaResponse.json();
-                   return media.source_url;
-               }
-           }
-       }
-       return null;
+      const response = await fetch(`${API_BASE}/wp/v2/settings?${getAuthParams()}`);
+
+      if (response.ok) {
+        const settings = await response.json();
+        const logoId = settings.site_logo;
+
+        if (logoId) {
+          const mediaResponse = await fetch(`${API_BASE}/wp/v2/media/${logoId}`);
+          if (mediaResponse.ok) {
+            const media = await mediaResponse.json();
+            return media.source_url;
+          }
+        }
+      }
+      return null;
     } catch (error) {
-       console.warn("Could not fetch site logo (likely requires permissions):", error);
-       return null;
+      console.warn("Could not fetch site logo (likely requires permissions):", error);
+      return null;
     }
   },
 
@@ -216,7 +270,7 @@ export const api = {
   getOrders: async (): Promise<Order[]> => {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) throw new Error("Mock");
-      
+
       // In a real app, you would filter by customer_id using current user context
       const response = await fetch(`${API_BASE}/wc/v3/orders?${getAuthParams()}&per_page=5`);
       const data = await handleResponse(response);
@@ -228,9 +282,9 @@ export const api = {
         total: o.total,
         currency: o.currency,
         line_items: o.line_items.map((li: any) => ({
-           name: li.name,
-           quantity: li.quantity,
-           total: li.total
+          name: li.name,
+          quantity: li.quantity,
+          total: li.total
         }))
       }));
 
@@ -263,24 +317,24 @@ export const api = {
   // -----------------------------------------------------------
   getPage: async (slug: string): Promise<{ title: string; content: string } | null> => {
     try {
-       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) throw new Error("Mock");
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) throw new Error("Mock");
 
-       const response = await fetch(`${API_BASE}/wp/v2/pages?slug=${slug}`);
-       const data = await handleResponse(response);
+      const response = await fetch(`${API_BASE}/wp/v2/pages?slug=${slug}`);
+      const data = await handleResponse(response);
 
-       if (data && data.length > 0) {
-         return {
-           title: data[0].title.rendered,
-           content: data[0].content.rendered
-         };
-       }
-       return null;
+      if (data && data.length > 0) {
+        return {
+          title: data[0].title.rendered,
+          content: data[0].content.rendered
+        };
+      }
+      return null;
     } catch (error) {
-       // Graceful fallback for demo
-       return {
-         title: slug.replace('-', ' ').toUpperCase(),
-         content: `<p>This is a placeholder for the <strong>${slug}</strong> page. In a real application, this content would be fetched from your WordPress pages.</p><p>Ensure you have a page with slug <em>"${slug}"</em> created in your WordPress Dashboard.</p>`
-       };
+      // Graceful fallback for demo
+      return {
+        title: slug.replace('-', ' ').toUpperCase(),
+        content: `<p>This is a placeholder for the <strong>${slug}</strong> page. In a real application, this content would be fetched from your WordPress pages.</p><p>Ensure you have a page with slug <em>"${slug}"</em> created in your WordPress Dashboard.</p>`
+      };
     }
   }
 };
