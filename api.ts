@@ -313,6 +313,164 @@ export const api = {
   },
 
   // -----------------------------------------------------------
+  // 7b. Submit Review (saves as WordPress comment on a "reviews" page, optional file to Media)
+  // Create a WordPress page with slug "reviews" or "testimonials" to collect these.
+  // -----------------------------------------------------------
+  submitReview: async (args: {
+    text: string;
+    file?: File;
+    authorName?: string;
+    authorEmail: string;
+  }): Promise<void> => {
+    const { text, file, authorName, authorEmail } = args;
+    if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+      throw new Error('WordPress is not configured. Set SITE_URL in api.ts.');
+    }
+
+    const escapeHtml = (s: string) =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    let attachmentHtml = '';
+    if (file) {
+      try {
+        const mediaUrl = `${API_BASE}/wp/v2/media?${getAuthParams()}`;
+        const res = await fetch(mediaUrl, {
+          method: 'POST',
+          body: file,
+          headers: {
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(file.name)}"`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const url = data.source_url || data.guid?.rendered || '';
+          const name = file.name || 'attachment';
+          if (url) attachmentHtml = ` <p>Attachment: <a href="${escapeHtml(url)}">${escapeHtml(name)}</a></p>`;
+        }
+      } catch (e) {
+        console.warn('Review attachment upload failed, submitting text only:', e);
+      }
+    }
+
+    const content = `<p>${escapeHtml(text)}</p>${attachmentHtml}`;
+
+    let postId: number | null = null;
+    for (const slug of ['reviews', 'testimonials']) {
+      const r = await fetch(`${API_BASE}/wp/v2/pages?slug=${slug}`);
+      if (!r.ok) continue;
+      const pages = await r.json();
+      if (pages && pages[0] && pages[0].id) {
+        postId = pages[0].id;
+        break;
+      }
+    }
+    if (!postId) {
+      throw new Error("Please create a WordPress page with slug 'reviews' or 'testimonials' to collect reviews.");
+    }
+
+    const res = await fetch(`${API_BASE}/wp/v2/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        post: postId,
+        content,
+        author_name: authorName || 'Guest',
+        author_email: authorEmail || 'guest@veenacollections.local',
+      }),
+    });
+    await handleResponse(res);
+  },
+
+  // -----------------------------------------------------------
+  // 7c. Newsletter Subscribe
+  // Suggests: MC4WP (Mailchimp for WordPress) or Newsletter by Stefano Lissa.
+  // This app POSTs to MC4WP's REST endpoint. If that 404s, we still resolve so the
+  // thank-you message shows; install a plugin to persist in WordPress.
+  // -----------------------------------------------------------
+  subscribeNewsletter: async (email: string): Promise<void> => {
+    if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return;
+
+    const url = `${API_BASE}/mc4wp/v1/subscribe`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
+    });
+    // 404 = MC4WP not installed; still show thank-you. 200/201 = success.
+    if (res.ok || res.status === 404) return;
+    const err = await res.text();
+    throw new Error(err || `Subscribe failed (${res.status})`);
+  },
+
+  // -----------------------------------------------------------
+  // 7d. Validate / Apply Coupon
+  // Uses WooCommerce GET /wc/v3/coupons?search=CODE to find coupon, then computes
+  // discount from amount + discount_type. Demo: SAVE10=10% off, FLAT5=$5 off.
+  // -----------------------------------------------------------
+  validateCoupon: async (
+    code: string,
+    subtotal: number
+  ): Promise<{ valid: true; code: string; discountAmount: number } | { valid: false; message: string }> => {
+    const codeClean = code.trim().toUpperCase();
+
+    // Demo fallback when WordPress not configured
+    if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+      if (codeClean === 'SAVE10') {
+        const amt = Math.min(subtotal * 0.1, subtotal);
+        return { valid: true, code: 'SAVE10', discountAmount: Math.round(amt * 100) / 100 };
+      }
+      if (codeClean === 'FLAT5') {
+        const amt = Math.min(5, subtotal);
+        return { valid: true, code: 'FLAT5', discountAmount: amt };
+      }
+      return { valid: false, message: 'Invalid or expired coupon.' };
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/wc/v3/coupons?${getAuthParams()}&search=${encodeURIComponent(codeClean)}&per_page=20`
+      );
+      const data = await handleResponse(response);
+      const coupon = Array.isArray(data)
+        ? data.find((c: any) => String(c.code || '').toUpperCase() === codeClean)
+        : null;
+
+      if (!coupon) return { valid: false, message: 'Coupon not found.' };
+
+      if (coupon.date_expires) {
+        const exp = new Date(coupon.date_expires);
+        if (exp.getTime() < Date.now()) return { valid: false, message: 'This coupon has expired.' };
+      }
+      const limit = coupon.usage_limit;
+      if (limit !== null && limit !== '' && Number(limit) > 0) {
+        const used = Number(coupon.usage_count) || 0;
+        if (used >= Number(limit)) return { valid: false, message: 'This coupon has reached its usage limit.' };
+      }
+
+      const amount = parseFloat(coupon.amount) || 0;
+      const dtype = String(coupon.discount_type || 'fixed_cart').toLowerCase();
+      let discountAmount = 0;
+      if (dtype === 'percent') {
+        discountAmount = Math.min((subtotal * amount) / 100, subtotal);
+      } else {
+        // fixed_cart, fixed_product, etc.
+        discountAmount = Math.min(amount, subtotal);
+      }
+      discountAmount = Math.round(discountAmount * 100) / 100;
+      if (discountAmount <= 0) return { valid: false, message: 'This coupon does not apply to this order.' };
+
+      return { valid: true, code: String(coupon.code), discountAmount };
+    } catch (e) {
+      console.warn('validateCoupon failed:', e);
+      return { valid: false, message: 'Could not validate coupon. Please try again.' };
+    }
+  },
+
+  // -----------------------------------------------------------
   // 8. Fetch Page Content (Privacy, Terms, etc.)
   // -----------------------------------------------------------
   getPage: async (slug: string): Promise<{ title: string; content: string } | null> => {

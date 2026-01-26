@@ -11,6 +11,7 @@ interface HeaderProps {
   menuItems: NavItem[];
   siteLogo?: string;
   siteName?: string;
+  isLoggedIn?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,7 +21,8 @@ export const Header: React.FC<HeaderProps> = ({
   wishlistCount,
   menuItems,
   siteLogo,
-  siteName = "VEENA COLLECTIONS"
+  siteName = "VEENA COLLECTIONS",
+  isLoggedIn = false
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Marquee Bar */}
       <div className="bg-[#f10044] text-white text-xs font-bold py-1.5 overflow-hidden border-b border-[#d1003a]">
         <div className="whitespace-nowrap animate-marquee inline-block">
-          WELCOME TO VEENACOLLECTION &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp; WELCOME TO VEENACOLLECTION &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp; WELCOME TO VEENACOLLECTION
+          Welcome to Veena Collections &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp; Welcome to Veena Collections &nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp; Welcome to Veena Collections
         </div>
       </div>
       {/* Top Bar */}
@@ -89,10 +91,12 @@ export const Header: React.FC<HeaderProps> = ({
               <Truck size={14} className="mr-1" />
               <span className="hidden sm:inline">Track Your Order</span>
             </button>
-            <button onClick={() => onNavigate('account', 'dashboard')} className="flex items-center hover:text-white transition">
-              <User size={14} className="mr-1" />
-              <span className="hidden sm:inline">My Account</span>
-            </button>
+            {isLoggedIn && (
+              <button onClick={() => onNavigate('account', 'dashboard')} className="flex items-center hover:text-white transition">
+                <User size={14} className="mr-1" />
+                <span className="hidden sm:inline">My Account</span>
+              </button>
+            )}
             <button
               onClick={() => onNavigate('wishlist')}
               className="flex items-center hover:text-white transition group"
@@ -107,13 +111,15 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
               <span className="hidden sm:inline">Wishlist</span>
             </button>
-            <button
-              onClick={() => onNavigate('register')}
-              className="flex items-center hover:text-white transition"
-            >
-              <Lock size={14} className="mr-1" />
-              <span className="hidden sm:inline">Log in</span>
-            </button>
+            {!isLoggedIn && (
+              <button
+                onClick={() => onNavigate('register')}
+                className="flex items-center hover:text-white transition"
+              >
+                <Lock size={14} className="mr-1" />
+                <span className="hidden sm:inline">Log in</span>
+              </button>
+            )}
             <button
               onClick={() => onNavigate('cart')}
               className="flex items-center text-[#e31e24] font-bold hover:text-red-400 transition group"
@@ -146,9 +152,9 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <div className="flex items-center">
                   {siteLogo ? (
-                    <img src={siteLogo} alt={siteName} className="h-16 mr-3 object-contain" />
+                    <img src={siteLogo} alt={siteName} className="h-16 lg:h-24 mr-3 object-contain" />
                   ) : (
-                    <div className="relative w-16 h-16 mr-3 border-2 border-white rounded-full flex items-center justify-center flex-shrink-0 bg-[#e31e24] text-white font-bold text-xl font-heading">
+                    <div className="relative w-16 h-16 lg:w-24 lg:h-24 mr-3 border-2 border-white rounded-full flex items-center justify-center flex-shrink-0 bg-[#e31e24] text-white font-bold text-xl lg:text-2xl font-heading">
                       VC
                     </div>
                   )}

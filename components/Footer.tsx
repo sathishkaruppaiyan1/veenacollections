@@ -1,20 +1,39 @@
 import React, { useState } from 'react';
-import { Facebook, Twitter, Instagram, ChevronDown } from 'lucide-react';
+import { Facebook, Instagram, ChevronDown, Loader2, Mail } from 'lucide-react';
 import { ViewState } from '../types';
+import { api } from '../api';
 
 interface FooterProps {
   onNavigate: (view: ViewState, param?: string) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
-  // State to manage which footer sections are open on mobile
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterStatus, setNewsletterStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [newsletterError, setNewsletterError] = useState('');
 
   const toggleSection = (section: string) => {
     setOpenSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = newsletterEmail.trim();
+    if (!email) return;
+    setNewsletterError('');
+    setNewsletterStatus('loading');
+    try {
+      await api.subscribeNewsletter(email);
+      setNewsletterStatus('success');
+      setNewsletterEmail('');
+    } catch (err) {
+      setNewsletterStatus('error');
+      setNewsletterError((err as Error).message || 'Something went wrong. Please try again.');
+    }
   };
 
   return (
@@ -25,16 +44,34 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           <div className="mb-4 md:mb-0 border-l-4 border-white pl-4">
             <h3 className="text-xl font-bold uppercase tracking-wide">Newsletter</h3>
           </div>
-          <div className="flex-1 max-w-xl mx-auto flex w-full md:px-8">
-            <input
-              type="email"
-              placeholder="Enter your email here..."
-              className="flex-1 px-4 py-2 text-gray-800 text-sm focus:outline-none rounded-l-sm"
-            />
-            <button className="bg-white text-[#e31e24] font-bold px-6 py-2 text-sm uppercase rounded-r-sm flex items-center hover:bg-gray-100 transition">
-              <span className="mr-2">✉</span> Subscribe
-            </button>
-          </div>
+          {newsletterStatus === 'success' ? (
+            <p className="flex-1 max-w-xl mx-auto md:px-8 text-white font-semibold text-center md:text-left flex items-center justify-center gap-2">
+              <Mail size={20} className="flex-shrink-0" />
+              Thank you! You are now subscribed to Veena Collections updates and exclusive offers.
+            </p>
+          ) : (
+            <form onSubmit={handleNewsletterSubmit} className="flex-1 max-w-xl mx-auto w-full md:px-8">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="email"
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  placeholder="Enter your email here..."
+                  className="flex-1 px-4 py-2 text-gray-800 text-sm focus:outline-none rounded-l-sm sm:rounded-r-none rounded"
+                  disabled={newsletterStatus === 'loading'}
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={newsletterStatus === 'loading'}
+                  className="bg-white text-[#e31e24] font-bold px-6 py-2 text-sm uppercase rounded-r-sm rounded-l-sm sm:rounded-l-none flex items-center justify-center hover:bg-gray-100 transition disabled:opacity-70"
+                >
+                  {newsletterStatus === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <><span className="mr-2">✉</span> Subscribe</>}
+                </button>
+              </div>
+              {newsletterError && <p className="text-sm text-white/90 mt-2">{newsletterError}</p>}
+            </form>
+          )}
         </div>
       </div>
 
@@ -75,7 +112,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <ul className="space-y-3 text-gray-400">
                 <li className="hover:text-[#e31e24] transition text-gray-400">Email: theveenacollections@gmail.com</li>
                 <li className="hover:text-[#e31e24] transition text-gray-400">Whatsapp: (909) 913-2080 only</li>
-                <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'contact')}>› Contact Us</li>
               </ul>
             </div>
           </div>
@@ -93,6 +129,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <ul className="space-y-3 text-gray-400">
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'shipping-policy')}>› Shipping Policy</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'refund_returns')}>› Refunds & Returns</li>
+                <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'rental-policy')}>› Rental Policy</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('page', 'privacy-policy')}>› Privacy Policy</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('cookie-policy')}>› Cookie Policy</li>
                 <li className="hover:text-[#e31e24] cursor-pointer transition" onClick={() => onNavigate('cookie-policy')}>› Do Not Sell My Info</li>
@@ -114,9 +151,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <div className="flex space-x-3 mb-8">
                 <a href="#" className="w-10 h-10 bg-black flex items-center justify-center hover:bg-[#e31e24] transition rounded-sm">
                   <Facebook size={18} />
-                </a>
-                <a href="#" className="w-10 h-10 bg-black flex items-center justify-center hover:bg-[#e31e24] transition rounded-sm">
-                  <Twitter size={18} />
                 </a>
                 <a href="#" className="w-10 h-10 bg-black flex items-center justify-center hover:bg-[#e31e24] transition rounded-sm">
                   <Instagram size={18} />

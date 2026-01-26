@@ -1,16 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { FloatingWhatsApp } from './components/FloatingWhatsApp';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { ProductCard } from './components/ProductCard';
 import { FilterBar } from './components/FilterBar';
 import { QuickViewModal } from './components/QuickViewModal';
+import { WriteReviewModal } from './components/WriteReviewModal';
 import { SocialShare } from './components/SocialShare';
 import { CookieConsent } from './components/CookieConsent';
 import { CookiePolicy } from './components/CookiePolicy';
+import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { api } from './api';
 import { Product, ViewState, CartItem, Category, NavItem, Variation, Order } from './types';
-import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Grid, List, Star, ShoppingCart, Heart, Loader2, User, Package, MapPin, LogOut, CreditCard, Quote } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, User, Package, MapPin, LogOut, CreditCard, Quote, Tag } from 'lucide-react';
 
 const DEFAULT_LOGO = "https://khaki-sparrow-300023.hostingersite.com/wp-content/uploads/2025/11/Blue-White-Modern-Minimalist-Name-Logo-2.png";
 
@@ -201,6 +203,11 @@ const App: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<{ email: string; name: string } | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
   // Navigation State
   const [accountTab, setAccountTab] = useState<'dashboard' | 'orders' | 'addresses' | 'details'>('dashboard');
@@ -212,7 +219,7 @@ const App: React.FC = () => {
   const [showOutOfStock, setShowOutOfStock] = useState<boolean>(false);
   const [productAttributes, setProductAttributes] = useState<any[]>([]);
   const [selectedFilterAttributes, setSelectedFilterAttributes] = useState<Record<string, string[]>>({});
-  const [sortBy, setSortBy] = useState<string>('default');
+  const [sortBy, setSortBy] = useState<string>('date-desc');
 
   // Dynamic Data States
   const [products, setProducts] = useState<Product[]>([]);
@@ -344,9 +351,11 @@ const App: React.FC = () => {
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
   };
 
-  const addToCart = (product: Product) => {
-    // Check if variable product and variation is selected
-    if (product.type === 'variable' && !currentVariation) {
+  const addToCart = (product: Product, opts?: { variation: Variation | null; selectedAttributes?: Record<string, string> }) => {
+    const useVariation = opts?.variation !== undefined ? opts.variation : currentVariation;
+    const useSelected = opts?.selectedAttributes !== undefined ? opts.selectedAttributes : selectedAttributes;
+
+    if (product.type === 'variable' && !useVariation) {
       showToast('Please select all options before adding to cart');
       return;
     }
@@ -354,11 +363,11 @@ const App: React.FC = () => {
     const itemToAdd = {
       id: product.id,
       name: product.name,
-      price: (currentVariation ? currentVariation.price : product.price),
-      image: (currentVariation && currentVariation.image?.src) ? currentVariation.image.src : product.image,
+      price: (useVariation ? useVariation.price : product.price),
+      image: (useVariation && useVariation.image?.src) ? useVariation.image.src : product.image,
       quantity: 1,
-      variationId: currentVariation?.id,
-      selectedAttributes: currentVariation ? selectedAttributes : undefined
+      variationId: useVariation?.id,
+      selectedAttributes: useVariation ? useSelected : undefined
     };
 
     setCart(prev => {
@@ -432,6 +441,40 @@ const App: React.FC = () => {
   // --- Views ---
 
   const CheckoutView = () => {
+    const [couponInput, setCouponInput] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountAmount: number } | null>(null);
+    const [couponError, setCouponError] = useState('');
+    const [couponLoading, setCouponLoading] = useState(false);
+
+    const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const discount = appliedCoupon ? Math.min(appliedCoupon.discountAmount, subtotal) : 0;
+    const total = Math.max(0, subtotal - discount);
+
+    const handleApplyCoupon = async () => {
+      const code = couponInput.trim();
+      if (!code) return;
+      setCouponLoading(true);
+      setCouponError('');
+      try {
+        const res = await api.validateCoupon(code, subtotal);
+        if (res.valid) {
+          setAppliedCoupon({ code: res.code, discountAmount: res.discountAmount });
+          setCouponInput('');
+        } else {
+          setCouponError(res.message);
+        }
+      } catch (e) {
+        setCouponError((e as Error).message || 'Could not validate coupon.');
+      } finally {
+        setCouponLoading(false);
+      }
+    };
+
+    const handleRemoveCoupon = () => {
+      setAppliedCoupon(null);
+      setCouponError('');
+    };
+
     const handlePlaceOrder = (e: React.FormEvent) => {
       e.preventDefault();
       setToast({ message: "Order placed successfully! (Demo)", visible: true });
@@ -494,9 +537,42 @@ const App: React.FC = () => {
                   </div>
                 ))}
               </div>
+              {/* Coupon */}
+              <div className="border-b border-gray-200 pb-4 mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Tag size={14} className="text-gray-500" />
+                  <span className="text-sm font-bold text-gray-700">Coupon code</span>
+                </div>
+                {appliedCoupon ? (
+                  <div className="flex justify-between items-center flex-wrap gap-2">
+                    <span className="text-sm text-green-700">Discount ({appliedCoupon.code}): -${discount.toFixed(2)}</span>
+                    <button type="button" onClick={handleRemoveCoupon} className="text-xs text-[#f10044] hover:underline">Remove</button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 flex-wrap">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => { setCouponInput(e.target.value); setCouponError(''); }}
+                      placeholder="Enter code"
+                      className="flex-1 min-w-[120px] border border-gray-300 p-2 text-sm"
+                      disabled={couponLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading || !couponInput.trim()}
+                      className="px-4 py-2 bg-gray-800 text-white text-sm font-bold uppercase hover:bg-black transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {couponLoading ? <Loader2 size={16} className="animate-spin" /> : 'Apply'}
+                    </button>
+                  </div>
+                )}
+                {couponError && <p className="text-red-600 text-xs mt-1">{couponError}</p>}
+              </div>
               <div className="flex justify-between font-bold text-gray-800 text-lg border-t border-gray-200 pt-4 mb-6">
                 <span>Total</span>
-                <span className="text-[#f10044]">${cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toFixed(2)}</span>
+                <span className="text-[#f10044]">${total.toFixed(2)}</span>
               </div>
               <button type="submit" form="checkout-form" className="w-full bg-[#f10044] text-white font-bold uppercase py-3 hover:bg-black transition">Place Order</button>
             </div>
@@ -543,7 +619,10 @@ const App: React.FC = () => {
               >
                 <MapPin size={16} className="mr-3" /> Addresses
               </button>
-              <button className="flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 text-gray-600">
+              <button
+                onClick={() => { googleLogout(); setUser(null); setIsLoggedIn(false); handleNavigate('home'); }}
+                className="flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 text-gray-600"
+              >
                 <LogOut size={16} className="mr-3" /> Logout
               </button>
             </nav>
@@ -553,7 +632,7 @@ const App: React.FC = () => {
           <div className="flex-1 bg-white border border-gray-200 p-6 min-h-[400px]">
             {accountTab === 'dashboard' && (
               <div>
-                <h2 className="text-lg font-bold text-gray-800 mb-4">Hello, User</h2>
+                <h2 className="text-lg font-bold text-gray-800 mb-4">Hello, {user?.name || 'User'}</h2>
                 <p className="text-gray-600 text-sm mb-4">
                   From your account dashboard you can view your <span className="text-[#f10044] cursor-pointer" onClick={() => setAccountTab('orders')}>recent orders</span>,
                   manage your <span className="text-[#f10044] cursor-pointer" onClick={() => setAccountTab('addresses')}>shipping and billing addresses</span>,
@@ -895,11 +974,11 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Featured Products */}
+        {/* Best Sellers */}
         <div className="bg-[#f6f6f6] py-16 mb-16">
           <div className="container mx-auto px-4">
             <div className="text-center mb-10">
-              <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Featured Products</h3>
+              <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Best Sellers</h3>
               <div className="w-12 h-0.5 bg-[#f10044] mx-auto mt-4"></div>
             </div>
 
@@ -926,115 +1005,145 @@ const App: React.FC = () => {
         {/* Customer Reviews */}
         <CustomerReviews />
 
+        <div className="container mx-auto px-4 text-center pt-6 pb-12">
+          <button
+            onClick={() => setShowReviewModal(true)}
+            className="bg-[#e31e24] text-white font-bold uppercase px-8 py-3 hover:bg-[#c41a1f] transition"
+          >
+            Write a Review
+          </button>
+        </div>
+
+        <WriteReviewModal
+          isOpen={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          onSubmit={async (data) => {
+            await api.submitReview(data);
+            setToast({ message: 'Thank you! Your review has been submitted.', visible: true });
+            setTimeout(() => setToast((p) => ({ ...p, visible: false })), 4000);
+            setShowReviewModal(false);
+          }}
+        />
+
       </>
     );
   };
 
-  const ShopView = () => (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center text-xs text-gray-500 mb-6">
-        <Home size={12} className="mr-1" />
-        <span className="mx-1">/</span>
-        <span className="font-bold text-gray-700">Shop</span>
-      </div>
+  const ShopView = () => {
+    const PAGE_SIZE = 12;
+    const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+    const filteredLengthRef = useRef(0);
 
-      <div className="mb-8 bg-gray-100 py-12 px-6 text-center border-b-4 border-[#f10044]">
-        <h1 className="text-4xl font-bold uppercase font-heading text-gray-800 tracking-wider">{currentCategory || "All Products"}</h1>
-        <p className="text-gray-500 mt-2 text-sm uppercase tracking-widest">Explore our exclusive collection</p>
-      </div>
+    const filteredProducts = useMemo(() => {
+      return products
+        .filter(p => {
+          if (currentCategory && p.category.toLowerCase() !== currentCategory.toLowerCase()) return false;
+          if (p.price < priceRange[0] || p.price > priceRange[1]) return false;
+          const hasSelectedAttributes = Object.entries(selectedFilterAttributes).every(([attrName, selectedTerms]) => {
+            const terms = selectedTerms as string[];
+            if (terms.length === 0) return true;
+            const productAttr = p.attributes.find(pa => pa.name === attrName);
+            if (!productAttr) return false;
+            return productAttr.options.some(opt => terms.includes(opt.toLowerCase().replace(/\s+/g, '-')));
+          });
+          if (!hasSelectedAttributes) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          switch (sortBy) {
+            case 'name-asc': return a.name.localeCompare(b.name);
+            case 'name-desc': return b.name.localeCompare(a.name);
+            case 'price-asc': return a.price - b.price;
+            case 'price-desc': return b.price - a.price;
+            case 'date-desc': return new Date(b.date_created || 0).getTime() - new Date(a.date_created || 0).getTime();
+            case 'date-asc': return new Date(a.date_created || 0).getTime() - new Date(b.date_created || 0).getTime();
+            default: return new Date(b.date_created || 0).getTime() - new Date(a.date_created || 0).getTime();
+          }
+        });
+    }, [products, currentCategory, priceRange, selectedFilterAttributes, sortBy]);
 
-      {/* Horizontal Filter Bar */}
-      <FilterBar
-        categories={categories}
-        onCategoryClick={(cat) => handleNavigate('shop', cat)}
-        priceRange={priceRange}
-        setPriceRange={setPriceRange}
-        showOutOfStock={showOutOfStock}
-        setShowOutOfStock={setShowOutOfStock}
-        attributes={productAttributes}
-        selectedAttributes={selectedFilterAttributes}
-        toggleAttribute={toggleAttributeFilter}
-      />
+    filteredLengthRef.current = filteredProducts.length;
 
-      <div className="flex-1">
+    useEffect(() => {
+      setDisplayCount(PAGE_SIZE);
+    }, [currentCategory, priceRange, selectedFilterAttributes, sortBy]);
 
-        {/* Toolbar */}
-        <div className="bg-white border border-gray-200 p-2 mb-6 flex flex-wrap justify-between items-center text-sm">
-          <div className="flex items-center space-x-4 mb-2 sm:mb-0">
-            <div className="flex items-center">
-              <span className="mr-2 text-gray-500">Sort by</span>
-              <select
-                className="border border-gray-300 p-1 text-gray-600 focus:outline-none"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value="default">Default</option>
-                <option value="name-asc">Name: A to Z</option>
-                <option value="name-desc">Name: Z to A</option>
-                <option value="price-asc">Price: Low to High</option>
-                <option value="price-desc">Price: High to Low</option>
-                <option value="date-desc">Newest Arrivals</option>
-                <option value="rating-desc">Rating: High to Low</option>
-              </select>
-            </div>
-            <div className="flex items-center">
-              <span className="mr-2 text-gray-500">Display</span>
-              <select className="border border-gray-300 p-1 text-gray-600 focus:outline-none">
-                <option>6</option>
-                <option>9</option>
-                <option>12</option>
-                <option>24</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex items-center space-x-1">
-            <button className="p-2 text-[#f10044] border border-gray-200"><Grid size={16} /></button>
-            <button className="p-2 text-gray-400 border border-transparent hover:border-gray-200"><List size={16} /></button>
-          </div>
+    useEffect(() => {
+      const el = loadMoreRef.current;
+      if (!el) return;
+      const obs = new IntersectionObserver(
+        () => {
+          setDisplayCount(prev => {
+            const total = filteredLengthRef.current;
+            if (prev >= total) return prev;
+            return Math.min(prev + PAGE_SIZE, total);
+          });
+        },
+        { rootMargin: '100px', threshold: 0 }
+      );
+      obs.observe(el);
+      return () => obs.disconnect();
+    }, []);
+
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center text-xs text-gray-500 mb-6">
+          <Home size={12} className="mr-1" />
+          <span className="mx-1">/</span>
+          <span className="font-bold text-gray-700">Shop</span>
         </div>
 
-        {/* Product Grid - Full Width */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products
-            .filter(p => {
-              // 1. Category Filter
-              if (currentCategory && p.category.toLowerCase() !== currentCategory.toLowerCase()) return false;
+        <div className="mb-8 bg-gray-100 py-12 px-6 text-center border-b-4 border-[#f10044]">
+          <h1 className="text-4xl font-bold uppercase font-heading text-gray-800 tracking-wider">{currentCategory || "All Products"}</h1>
+          <p className="text-gray-500 mt-2 text-sm uppercase tracking-widest">Explore our exclusive collection</p>
+        </div>
 
-              // 2. Price Filter (Simple check against main price)
-              if (p.price < priceRange[0] || p.price > priceRange[1]) return false;
+        {/* Filters and Sort in one line */}
+        <FilterBar
+          categories={categories}
+          onCategoryClick={(cat) => handleNavigate('shop', cat)}
+          priceRange={priceRange}
+          setPriceRange={setPriceRange}
+          showOutOfStock={showOutOfStock}
+          setShowOutOfStock={setShowOutOfStock}
+          attributes={productAttributes}
+          selectedAttributes={selectedFilterAttributes}
+          toggleAttribute={toggleAttributeFilter}
+          endContent={
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Sort by</span>
+                <select
+                  className="border border-gray-300 p-1.5 text-sm text-gray-600 focus:outline-none focus:border-[#f10044]"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                >
+                  <option value="date-desc">Date: New to Old</option>
+                  <option value="date-asc">Date: Old to New</option>
+                  <option value="name-asc">Name: A to Z</option>
+                  <option value="name-desc">Name: Z to A</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Display</span>
+                <select className="border border-gray-300 p-1.5 text-sm text-gray-600 focus:outline-none focus:border-[#f10044]">
+                  <option>6</option>
+                  <option>9</option>
+                  <option>12</option>
+                  <option>24</option>
+                </select>
+              </div>
+            </>
+          }
+        />
 
-              // 3. Stock Filter
-              // if (!showOutOfStock && p.stock_status === 'outofstock') return false; 
-
-              // 4. Attribute Filter
-              const hasSelectedAttributes = Object.entries(selectedFilterAttributes).every(([attrName, selectedTerms]) => {
-                const terms = selectedTerms as string[];
-                if (terms.length === 0) return true;
-
-                // Check if product has this attribute with one of the selected terms
-                const productAttr = p.attributes.find(pa => pa.name === attrName);
-                if (!productAttr) return false;
-
-                // Check if any of the product's options for this attribute match selected terms
-                return productAttr.options.some(opt => terms.includes(opt.toLowerCase().replace(/\s+/g, '-')));
-              });
-
-              if (!hasSelectedAttributes) return false;
-
-              return true;
-            })
-            .sort((a, b) => {
-              switch (sortBy) {
-                case 'name-asc': return a.name.localeCompare(b.name);
-                case 'name-desc': return b.name.localeCompare(a.name);
-                case 'price-asc': return a.price - b.price;
-                case 'price-desc': return b.price - a.price;
-                case 'date-desc': return new Date(b.date_created || 0).getTime() - new Date(a.date_created || 0).getTime();
-                case 'rating-desc': return b.rating - a.rating;
-                default: return 0;
-              }
-            })
-            .map(product => (
+        <div className="flex-1">
+          {/* Product Grid - Full Width */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {filteredProducts.slice(0, displayCount).map(product => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -1045,10 +1154,12 @@ const App: React.FC = () => {
                 isWishlisted={isInWishlist(product.id)}
               />
             ))}
+          </div>
+          <div ref={loadMoreRef} className="h-10" aria-hidden="true" />
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const ProductView = () => {
     if (!activeProduct) return null;
@@ -1084,12 +1195,6 @@ const App: React.FC = () => {
             <p className="text-sm text-gray-500 mb-6 leading-relaxed">
               Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.
             </p>
-
-            <div className="flex space-x-1 text-yellow-400 mb-4">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} size={16} fill={i < activeProduct.rating ? "currentColor" : "none"} />
-              ))}
-            </div>
 
             <div className="border-t border-b border-gray-100 py-4 mb-6">
               <span className="text-gray-500 text-sm mr-2">Manufacturer:</span>
@@ -1351,7 +1456,8 @@ const App: React.FC = () => {
 
     const handleLogin = (e: React.FormEvent) => {
       e.preventDefault();
-      // Simulate login
+      setUser({ email: loginEmail, name: loginEmail.split('@')[0] || 'User' });
+      setIsLoggedIn(true);
       setToast({ message: `Welcome back, ${loginEmail}!`, visible: true });
       setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
       handleNavigate('account', 'dashboard');
@@ -1359,14 +1465,32 @@ const App: React.FC = () => {
 
     const handleRegister = (e: React.FormEvent) => {
       e.preventDefault();
-      // Simulate registration
       setIsRegistering(true);
       setTimeout(() => {
         setIsRegistering(false);
+        setUser({ email: registerEmail, name: registerEmail.split('@')[0] || 'User' });
+        setIsLoggedIn(true);
         setToast({ message: "Registration successful! Please check your email.", visible: true });
         setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
         handleNavigate('account', 'dashboard');
       }, 1500);
+    };
+
+    const handleGoogleSuccess = (credentialResponse: { credential?: string }) => {
+      if (!credentialResponse.credential) return;
+      try {
+        const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
+        const name = payload.name || payload.email || 'User';
+        const email = payload.email || '';
+        setUser({ name, email });
+        setIsLoggedIn(true);
+        setToast({ message: `Welcome, ${name}!`, visible: true });
+        setTimeout(() => setToast(p => ({ ...p, visible: false })), 3000);
+        handleNavigate('account', 'dashboard');
+      } catch {
+        setToast({ message: 'Google sign-in failed.', visible: true });
+        setTimeout(() => setToast(p => ({ ...p, visible: false })), 3000);
+      }
     };
 
     return (
@@ -1407,6 +1531,30 @@ const App: React.FC = () => {
               <button type="submit" className="bg-[#f10044] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm w-full md:w-auto">
                 Log In
               </button>
+              {googleClientId && (
+                <>
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-200" />
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500">Or sign in with Google</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => {
+                        setToast({ message: 'Google sign-in failed. Please try again.', visible: true });
+                        setTimeout(() => setToast(p => ({ ...p, visible: false })), 3000);
+                      }}
+                      theme="outline"
+                      size="large"
+                      text="continue_with"
+                    />
+                  </div>
+                </>
+              )}
             </form>
           </div>
 
@@ -1581,6 +1729,7 @@ const App: React.FC = () => {
         menuItems={menuItems}
         siteLogo={siteLogo || undefined}
         siteName={siteInfo.name}
+        isLoggedIn={isLoggedIn}
       />
 
       <main className="flex-1 bg-white">

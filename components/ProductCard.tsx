@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, Heart, Eye, Star } from 'lucide-react';
+import { ShoppingCart, Heart, Eye } from 'lucide-react';
 import { Product } from '../types';
 
 interface ProductCardProps {
@@ -67,11 +67,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onAd
           <span className="text-black font-bold text-lg">${product.price.toFixed(2)}</span>
         </div>
 
-        <div className="flex justify-center text-yellow-400 text-xs">
-          {[...Array(5)].map((_, i) => (
-            <Star key={i} size={12} fill={i < product.rating ? "currentColor" : "none"} stroke="currentColor" className={i < product.rating ? "" : "text-gray-300"} />
-          ))}
-        </div>
       </div>
     </div>
   );

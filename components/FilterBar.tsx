@@ -17,6 +17,7 @@ interface FilterBarProps {
     attributes: any[];
     selectedAttributes: Record<string, string[]>;
     toggleAttribute: (attrName: string, termSlug: string) => void;
+    endContent?: React.ReactNode;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -28,7 +29,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     setShowOutOfStock,
     attributes,
     selectedAttributes,
-    toggleAttribute
+    toggleAttribute,
+    endContent
 }) => {
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -198,6 +200,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                         )}
                     </div>
                 ))}
+
+                {endContent && <div className="ml-auto flex items-center gap-4 flex-shrink-0">{endContent}</div>}
 
                 {/* Reset Filters (optional visual cue) */}
                 {(priceRange[0] > 0 || priceRange[1] < 1000 || showOutOfStock || Object.values(selectedAttributes).some(v => (v as string[]).length > 0)) && (
