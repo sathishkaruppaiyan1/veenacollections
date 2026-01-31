@@ -11,7 +11,7 @@ export const CookiePolicy: React.FC<CookiePolicyProps> = ({ onBack }) => {
             {/* Header */}
             <div className="bg-gray-50 border-b border-gray-100 py-12">
                 <div className="container mx-auto px-4 text-center">
-                    <Cookie size={48} className="mx-auto text-[#f10044] mb-4" />
+                    <Cookie size={48} className="mx-auto text-[#EE6348] mb-4" />
                     <h1 className="text-3xl font-bold uppercase font-heading text-gray-800 tracking-tight">California Cookie Policy</h1>
                     <p className="text-gray-500 mt-2 max-w-2xl mx-auto">
                         This policy describes how Veena Collections uses cookies and similar technologies in compliance with the CCPA and CPRA.
@@ -24,7 +24,7 @@ export const CookiePolicy: React.FC<CookiePolicyProps> = ({ onBack }) => {
                 <div className="max-w-4xl mx-auto prose prose-red">
                     <section className="mb-12">
                         <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-                            <Info size={20} className="mr-2 text-[#f10044]" /> 1. Introduction
+                            <Info size={20} className="mr-2 text-[#EE6348]" /> 1. Introduction
                         </h2>
                         <p className="text-gray-600 leading-relaxed">
                             At Veena Collections, we respect your privacy. This Cookie Policy explains how we use cookies, web beacons, pixels, and other tracking technologies on our website. For residents of California, this policy serves as a notice under the California Consumer Privacy Act (CCPA) and California Privacy Rights Act (CPRA).
@@ -33,7 +33,7 @@ export const CookiePolicy: React.FC<CookiePolicyProps> = ({ onBack }) => {
 
                     <section className="mb-12">
                         <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-                            <Cookie size={20} className="mr-2 text-[#f10044]" /> 2. What are Cookies?
+                            <Cookie size={20} className="mr-2 text-[#EE6348]" /> 2. What are Cookies?
                         </h2>
                         <p className="text-gray-600 leading-relaxed">
                             Cookies are small data files that are placed on your computer or mobile device when you visit a website. They are widely used by website owners to make their websites work, or to work more efficiently, as well as to provide reporting information.
@@ -42,10 +42,10 @@ export const CookiePolicy: React.FC<CookiePolicyProps> = ({ onBack }) => {
 
                     <section className="mb-12">
                         <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-                            <Shield size={20} className="mr-2 text-[#f10044]" /> 3. How We Use Cookies
+                            <Shield size={20} className="mr-2 text-[#EE6348]" /> 3. How We Use Cookies
                         </h2>
                         <div className="space-y-6">
-                            <div className="bg-gray-50 p-6 rounded-lg border-l-4 border-[#f10044]">
+                            <div className="bg-gray-50 p-6 rounded-lg border-l-4 border-[#EE6348]">
                                 <h3 className="font-bold text-gray-800 mb-2">Essential Cookies</h3>
                                 <p className="text-sm text-gray-600">These are strictly necessary to provide you with services available through our website and to use some of its features, such as access to secure areas.</p>
                             </div>
@@ -64,7 +64,7 @@ export const CookiePolicy: React.FC<CookiePolicyProps> = ({ onBack }) => {
                         </div>
                     </section>
 
-                    <section className="mb-12 bg-red-50 p-8 rounded-xl border border-red-100">
+                    <section className="mb-12 bg-red-50 p-8 rounded-xl border border-orange-100">
                         <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
                             <XCircle size={20} className="mr-2 text-red-600" /> 4. California Resident Rights (CCPA/CPRA)
                         </h2>
@@ -91,7 +91,7 @@ export const CookiePolicy: React.FC<CookiePolicyProps> = ({ onBack }) => {
                                 localStorage.removeItem('cookie-consent');
                                 window.location.reload();
                             }}
-                            className="bg-[#f10044] text-white px-6 py-2 rounded font-bold hover:bg-black transition text-sm"
+                            className="bg-[#EE6348] text-white px-6 py-2 rounded font-bold hover:bg-black transition text-sm"
                         >
                             Reset Cookie Preferences
                         </button>
@@ -101,7 +101,7 @@ export const CookiePolicy: React.FC<CookiePolicyProps> = ({ onBack }) => {
                         <p className="text-gray-400 text-sm mb-4 md:mb-0">Last updated: January 19, 2026</p>
                         <button
                             onClick={onBack}
-                            className="text-[#f10044] font-bold hover:underline uppercase tracking-widest text-xs"
+                            className="text-[#EE6348] font-bold hover:underline uppercase tracking-widest text-xs"
                         >
                             Back to Shopping
                         </button>

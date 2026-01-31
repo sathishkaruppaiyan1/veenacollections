@@ -91,18 +91,18 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen,
 
             <div className="flex items-center space-x-3 mb-6">
               {displayOldPrice != null && <span className="text-gray-400 line-through text-lg">${displayOldPrice.toFixed(2)}</span>}
-              <span className="text-2xl font-bold text-[#f10044]">${displayPrice.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-[#EE6348]">${displayPrice.toFixed(2)}</span>
             </div>
 
             {/* Variation selectors: Size, Color, etc. */}
             {isVariable && variationAttrs.length > 0 && (
               <div className="mb-6 space-y-4">
-                {variationLoading && <div className="text-xs text-[#f10044]">Loading options…</div>}
+                {variationLoading && <div className="text-xs text-[#EE6348]">Loading options…</div>}
                 {variationAttrs.map((attr) => (
                   <div key={attr.id} className="flex flex-col">
                     <label className="text-sm font-bold text-gray-700 mb-1">{attr.name}</label>
                     <select
-                      className="border border-gray-300 p-2 text-sm w-full max-w-[200px] focus:border-[#f10044] outline-none"
+                      className="border border-gray-300 p-2 text-sm w-full max-w-[200px] focus:border-[#EE6348] outline-none"
                       value={selectedAttributes[attr.name] || ''}
                       onChange={(e) => setSelectedAttributes((s) => ({ ...s, [attr.name]: e.target.value }))}
                     >
@@ -130,7 +130,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen,
                 onClose();
               }}
               disabled={!canAddToCart}
-              className={`bg-[#f10044] text-white py-3 px-8 rounded-full font-bold uppercase tracking-wider flex items-center justify-center gap-2 w-full md:w-auto transition ${
+              className={`bg-[#EE6348] text-white py-3 px-8 rounded-full font-bold uppercase tracking-wider flex items-center justify-center gap-2 w-full md:w-auto transition ${
                 canAddToCart ? 'hover:bg-black' : 'opacity-60 cursor-not-allowed'
               }`}
             >

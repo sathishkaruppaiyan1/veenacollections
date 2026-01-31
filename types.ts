@@ -32,6 +32,13 @@ export interface Product {
   type: string; // 'simple', 'variable', etc.
   attributes: ProductAttribute[];
   date_created: string;
+  sale_price?: string;
+  date_on_sale_to?: string; // ISO string for sale end date
+}
+
+export interface DealOfTheDayData {
+  products: Product[];
+  saleEndDate: string | null; // The earliest sale end date among products
 }
 
 export interface CartItem extends Product {
@@ -49,7 +56,7 @@ export interface Order {
   line_items: Array<{ name: string; quantity: number; total: string }>;
 }
 
-export type ViewState = 'home' | 'shop' | 'product' | 'cart' | 'wishlist' | 'register' | 'account' | 'page' | 'checkout' | 'track-order' | 'categories' | 'deal' | 'rent' | 'cookie-policy';
+export type ViewState = 'home' | 'shop' | 'product' | 'cart' | 'wishlist' | 'register' | 'account' | 'page' | 'checkout' | 'track-order' | 'categories' | 'deal' | 'rent' | 'cookie-policy' | 'thank-you';
 
 export interface Category {
   id: number;

@@ -10,7 +10,7 @@ const WhatsAppIcon = ({ size = 18, className = "" }) => (
         fill="currentColor"
         className={className}
     >
-        <path d="M12.012 2.01a9.988 9.988 0 0 0-9.98 9.98c0 1.765.46 3.447 1.284 4.887l-1.304 4.747 4.856-1.272a9.96 9.96 0 0 0 4.823 1.233H12c5.524 0 10-4.476 10-10 0-5.524-4.476-10-10-10zm5.847 14.241c-.244.686-1.42 1.334-2.008 1.408-.511.085-1.157.108-1.867-.125-.434-.142-.989-.318-1.7-.619-2.983-1.29-4.93-4.29-5.078-4.49-.149-.2-1.21-1.611-1.21-3.071s.766-2.176 1.042-2.476c.276-.3.511-.371.698-.371.185 0 .354.012.492.012.149.006.353-.058.552.428.2.49.691 1.685.753 1.808.062.124.1.267.018.43-.081.161-.124.267-.248.41-.124.143-.261.317-.373.422-.124.124-.255.255-.112.497.143.243 1.264 2.086 2.614 3.284.88.783 1.48 1.758 1.653 2.057.174.298.019.458-.13.607-.137.136-.3.354-.453.527-.149.174-.199.298-.304.497-.106.2-.05.372.025.521.075.149.669 1.612.916 2.207.243.579.488.5.669.51.182.012.378.012.57.012.199 0 .524-.074.795-.373.273-.298 1.04-1.016 1.04-2.479 0-1.463-1.066-2.876-1.214-3.075-.149-.199-2.097-3.2-5.078-4.488-.709-.306-1.262-.489-1.694-.626-.712-.226-1.361-.194-1.872-.118-.571.085-1.759.719-2.006 1.413-.248.695-.248 1.29-.174 1.413.074.124.272.198.57.347z" />
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
     </svg>
 );
 
@@ -60,7 +60,7 @@ export const SocialShare: React.FC<SocialShareProps> = ({ productUrl, productNam
         return (
             <button
                 onClick={handleNativeShare}
-                className="flex items-center text-gray-700 hover:text-white transition-all text-sm font-bold mt-4 border-2 border-gray-200 px-6 py-2.5 rounded-full hover:bg-[#f10044] hover:border-[#f10044] shadow-sm uppercase tracking-wider"
+                className="flex items-center text-gray-700 hover:text-white transition-all text-sm font-bold mt-4 border-2 border-gray-200 px-6 py-2.5 rounded-full hover:bg-[#EE6348] hover:border-[#EE6348] shadow-sm uppercase tracking-wider"
             >
                 <Share2 size={18} className="mr-2" /> Share this product
             </button>
@@ -74,7 +74,7 @@ export const SocialShare: React.FC<SocialShareProps> = ({ productUrl, productNam
             {/* Email */}
             <a
                 href={`mailto:?subject=Check out ${productName}&body=I found this amazing product: ${productUrl}`}
-                className="w-10 h-10 rounded-full bg-gray-50 text-gray-500 hover:bg-[#f10044] hover:text-white flex items-center justify-center transition-all duration-300 shadow-sm border border-gray-200 hover:scale-110"
+                className="w-10 h-10 rounded-full bg-gray-50 text-gray-500 hover:bg-[#EE6348] hover:text-white flex items-center justify-center transition-all duration-300 shadow-sm border border-gray-200 hover:scale-110"
                 title="Share via Email"
             >
                 <Mail size={20} />

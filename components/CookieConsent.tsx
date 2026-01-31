@@ -29,10 +29,10 @@ export const CookieConsent: React.FC<CookieConsentProps> = ({ onViewPolicy }) =>
             <div className="container mx-auto max-w-6xl">
                 <div className="bg-white border border-gray-200 shadow-2xl rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
                     {/* Accent decoration */}
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-[#f10044]"></div>
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-[#EE6348]"></div>
 
                     <div className="flex items-start gap-4">
-                        <div className="bg-red-50 p-3 rounded-full text-[#f10044] flex-shrink-0">
+                        <div className="bg-orange-50 p-3 rounded-full text-[#EE6348] flex-shrink-0">
                             <Cookie size={24} />
                         </div>
                         <div>
@@ -45,7 +45,7 @@ export const CookieConsent: React.FC<CookieConsentProps> = ({ onViewPolicy }) =>
                                 By clicking "Accept", you agree to our use of cookies as described in our{' '}
                                 <button
                                     onClick={onViewPolicy}
-                                    className="text-[#f10044] font-bold hover:underline underline-offset-2"
+                                    className="text-[#EE6348] font-bold hover:underline underline-offset-2"
                                 >
                                     Privacy & Cookie Policy
                                 </button>.
@@ -70,7 +70,7 @@ export const CookieConsent: React.FC<CookieConsentProps> = ({ onViewPolicy }) =>
                         </button>
                         <button
                             onClick={() => handleAction('accepted')}
-                            className="w-full sm:w-auto px-10 py-2.5 text-sm font-bold text-white bg-[#f10044] hover:bg-black rounded transition shadow-md shadow-red-100 uppercase tracking-wider"
+                            className="w-full sm:w-auto px-10 py-2.5 text-sm font-bold text-white bg-[#EE6348] hover:bg-black rounded transition shadow-md shadow-orange-100 uppercase tracking-wider"
                         >
                             Accept All
                         </button>

@@ -12,26 +12,48 @@ import { CookiePolicy } from './components/CookiePolicy';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { api } from './api';
 import { Product, ViewState, CartItem, Category, NavItem, Variation, Order } from './types';
-import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, User, Package, MapPin, LogOut, CreditCard, Quote, Tag } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, User, Package, MapPin, LogOut, CreditCard, Quote, Tag, Truck, Phone, Mail } from 'lucide-react';
 
-const DEFAULT_LOGO = "https://khaki-sparrow-300023.hostingersite.com/wp-content/uploads/2025/11/Blue-White-Modern-Minimalist-Name-Logo-2.png";
+const DEFAULT_LOGO = "https://admin.theveenacollections.com/wp-content/uploads/2025/11/Blue-White-Modern-Minimalist-Name-Logo-2.png";
 
 interface DealProps {
   onNavigate: (view: any) => void;
-  products: Product[];
   onProductClick: (id: number) => void;
   onAddToCart: (p: Product) => void;
   onToggleWishlist: (p: Product) => void;
   isInWishlist: (id: number) => boolean;
+  onQuickView: (p: Product) => void;
 }
 
-const DealOfTheDay = ({ onNavigate, products, onProductClick, onAddToCart, onToggleWishlist, isInWishlist }: DealProps) => {
+const DealOfTheDay = ({ onNavigate, onProductClick, onAddToCart, onToggleWishlist, isInWishlist, onQuickView }: DealProps) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [dealProducts, setDealProducts] = useState<Product[]>([]);
+  const [saleEndDate, setSaleEndDate] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [dealExpired, setDealExpired] = useState(false);
 
+  // Fetch deal products from WooCommerce
   useEffect(() => {
-    // Set a target date 2 days from now for demo purposes
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 2);
+    const fetchDeals = async () => {
+      setLoading(true);
+      try {
+        const data = await api.getDealProducts();
+        setDealProducts(data.products);
+        setSaleEndDate(data.saleEndDate);
+      } catch (error) {
+        console.error("Failed to fetch deal products:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDeals();
+  }, []);
+
+  // Timer countdown based on sale end date from WooCommerce
+  useEffect(() => {
+    if (!saleEndDate) return;
+
+    const targetDate = new Date(saleEndDate);
 
     const interval = setInterval(() => {
       const now = new Date();
@@ -43,45 +65,50 @@ const DealOfTheDay = ({ onNavigate, products, onProductClick, onAddToCart, onTog
         const minutes = Math.floor((difference / 1000 / 60) % 60);
         const seconds = Math.floor((difference / 1000) % 60);
         setTimeLeft({ days, hours, minutes, seconds });
+        setDealExpired(false);
       } else {
+        setDealExpired(true);
         clearInterval(interval);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [saleEndDate]);
+
+  // Don't render if no deal products or deal expired
+  if (!loading && (dealProducts.length === 0 || dealExpired)) {
+    return null;
+  }
 
   return (
-    <div className="bg-[#e31e24] py-12 md:py-16 text-white overflow-hidden relative mb-16">
-      {/* Background Image updated to Saree/Texture */}
-      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=2574&auto=format&fit=crop')] bg-cover bg-center opacity-25"></div>
+    <div className="bg-[#B8A99A] py-12 md:py-16 text-[#0b141b] overflow-hidden relative">
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-10 mb-12">
           <div className="lg:w-1/2 text-center lg:text-left">
-            <h3 className="text-lg font-bold uppercase mb-2 tracking-widest text-white/80">Don't Miss Out</h3>
+            <h3 className="text-lg font-bold uppercase mb-2 tracking-widest text-[#0b141b]/70">Don't Miss Out</h3>
             <h2 className="text-4xl md:text-5xl font-bold font-heading mb-6 uppercase">Deal of the Day</h2>
-            <p className="mb-8 max-w-lg mx-auto lg:mx-0 text-lg text-white/90">Get up to 50% off on our exclusive traditional saree and jewelry collection. Limited time offer!</p>
+            <p className="mb-8 max-w-lg mx-auto lg:mx-0 text-lg text-[#0b141b]/80">Get up to 50% off on our exclusive traditional saree and jewelry collection. Limited time offer!</p>
             <button
-              onClick={() => onNavigate('shop')}
-              className="bg-white text-[#e31e24] px-10 py-3.5 font-bold uppercase hover:bg-black hover:text-white transition shadow-lg text-sm tracking-widest"
+              onClick={() => onNavigate('deal')}
+              className="bg-[#EE6348] text-white px-10 py-3.5 font-bold uppercase hover:bg-black hover:text-white transition shadow-lg text-sm tracking-widest"
             >
               Shop The Deal
             </button>
           </div>
           <div className="lg:w-1/2 flex justify-center gap-3 md:gap-6">
-            <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-white/20">
+            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
               <span className="text-3xl md:text-4xl font-bold">{timeLeft.days}</span>
               <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Days</span>
             </div>
-            <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-white/20">
+            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
               <span className="text-3xl md:text-4xl font-bold">{timeLeft.hours}</span>
               <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Hours</span>
             </div>
-            <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-white/20">
+            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
               <span className="text-3xl md:text-4xl font-bold">{timeLeft.minutes}</span>
               <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Mins</span>
             </div>
-            <div className="flex flex-col items-center bg-black/30 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-white/20">
+            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
               <span className="text-3xl md:text-4xl font-bold">{timeLeft.seconds}</span>
               <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Secs</span>
             </div>
@@ -89,15 +116,20 @@ const DealOfTheDay = ({ onNavigate, products, onProductClick, onAddToCart, onTog
         </div>
 
         {/* Products Grid Below Timer */}
-        {products.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-8 border-t border-white/20">
-            {products.slice(0, 3).map(product => (
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="animate-spin text-[#0b141b]" size={32} />
+          </div>
+        ) : dealProducts.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-8 border-t border-white/20">
+            {dealProducts.map(product => (
               <ProductCard
                 key={product.id}
                 product={product}
                 onClick={onProductClick}
                 onAddToCart={onAddToCart}
                 onToggleWishlist={onToggleWishlist}
+                onQuickView={onQuickView}
                 isWishlisted={isInWishlist(product.id)}
               />
             ))}
@@ -109,13 +141,13 @@ const DealOfTheDay = ({ onNavigate, products, onProductClick, onAddToCart, onTog
 };
 
 const CustomerReviews = () => {
-  const reviews = [
+  // Default/fallback reviews shown while loading or if no reviews exist
+  const defaultReviews = [
     {
       id: 1,
       name: "Sarah Johnson",
       rating: 5,
       text: "Absolutely stunning saree! The craftsmanship is incredible and it looks even better in person. Fast shipping too.",
-      role: "Verified Buyer",
       image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=2574&auto=format&fit=crop"
     },
     {
@@ -123,7 +155,6 @@ const CustomerReviews = () => {
       name: "Michael Chen",
       rating: 4,
       text: "Great quality for the price. The fabric is very comfortable. Would definitely recommend Veena Collections.",
-      role: "Regular Customer",
       image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?q=80&w=2670&auto=format&fit=crop"
     },
     {
@@ -131,14 +162,43 @@ const CustomerReviews = () => {
       name: "Emily Davis",
       rating: 5,
       text: "I bought the silver jewelry set for my sister and she loves it. The packaging was beautiful and premium.",
-      role: "Verified Buyer",
       image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?q=80&w=2670&auto=format&fit=crop"
     }
   ];
 
+  const [reviews, setReviews] = useState(defaultReviews);
   const [currentReview, setCurrentReview] = useState(0);
+  const [loading, setLoading] = useState(true);
 
+  // Fetch approved reviews from WordPress
   useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const fetchedReviews = await api.getReviews();
+        if (fetchedReviews.length > 0) {
+          // Map fetched reviews to display format
+          const formattedReviews = fetchedReviews.map(r => ({
+            id: r.id,
+            name: r.name,
+            rating: r.rating,
+            text: r.text,
+            image: r.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=EE6348&color=fff&size=200`
+          }));
+          setReviews(formattedReviews);
+        }
+      } catch (error) {
+        console.error("Failed to fetch reviews:", error);
+        // Keep default reviews on error
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReviews();
+  }, []);
+
+  // Auto-rotate reviews
+  useEffect(() => {
+    if (reviews.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentReview(prev => (prev + 1) % reviews.length);
     }, 6000);
@@ -150,47 +210,60 @@ const CustomerReviews = () => {
       <div className="container mx-auto px-4 text-center">
         <div className="text-center mb-10">
           <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Customer Reviews</h3>
-          <div className="w-12 h-0.5 bg-[#e31e24] mx-auto mt-4"></div>
+          <div className="w-12 h-0.5 bg-[#EE6348] mx-auto mt-4"></div>
         </div>
 
         <div className="max-w-5xl mx-auto relative bg-white p-8 md:p-12 shadow-sm rounded-sm">
-          <Quote size={48} className="text-[#e31e24]/10 absolute top-4 left-4" />
-          <Quote size={48} className="text-[#e31e24]/10 absolute bottom-4 right-4 transform rotate-180" />
+          <Quote size={48} className="text-[#EE6348]/10 absolute top-4 left-4" />
+          <Quote size={48} className="text-[#EE6348]/10 absolute bottom-4 right-4 transform rotate-180" />
 
-          <div className="relative min-h-[180px] flex flex-col md:flex-row items-center gap-8 transition-all duration-500">
-            {/* Product Image */}
-            <div className="w-32 h-32 md:w-48 md:h-48 flex-shrink-0 rounded-lg overflow-hidden border border-gray-100 shadow-sm">
-              <img
-                src={reviews[currentReview].image}
-                alt="Product"
-                className="w-full h-full object-cover"
-              />
+          {loading ? (
+            <div className="flex justify-center items-center min-h-[180px]">
+              <Loader2 className="animate-spin text-[#EE6348]" size={32} />
             </div>
+          ) : (
+            <>
+              <div className="relative min-h-[180px] flex flex-col md:flex-row items-center gap-8 transition-all duration-500">
+                {/* Review Image or Avatar */}
+                <div className="w-32 h-32 md:w-48 md:h-48 flex-shrink-0 rounded-lg overflow-hidden border border-gray-100 shadow-sm">
+                  <img
+                    src={reviews[currentReview]?.image}
+                    alt={reviews[currentReview]?.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(reviews[currentReview]?.name || 'User')}&background=EE6348&color=fff&size=200`;
+                    }}
+                  />
+                </div>
 
-            {/* Review Content */}
-            <div className="flex-1 text-center md:text-left">
-              <div className="flex justify-center md:justify-start mb-4 text-[#e31e24]">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={20} fill={i < reviews[currentReview].rating ? "currentColor" : "none"} stroke="currentColor" className={i < reviews[currentReview].rating ? "" : "text-gray-300"} />
-                ))}
+                {/* Review Content */}
+                <div className="flex-1 text-center md:text-left">
+                  <div className="flex justify-center md:justify-start mb-4 text-[#EE6348]">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={20} fill={i < (reviews[currentReview]?.rating || 5) ? "currentColor" : "none"} stroke="currentColor" className={i < (reviews[currentReview]?.rating || 5) ? "" : "text-gray-300"} />
+                    ))}
+                  </div>
+                  <p className="text-gray-600 text-lg italic mb-6 leading-relaxed">"{reviews[currentReview]?.text}"</p>
+                  <div>
+                    <h4 className="font-bold text-gray-800 uppercase tracking-wide">{reviews[currentReview]?.name}</h4>
+                    <span className="text-xs text-gray-500">Verified Buyer</span>
+                  </div>
+                </div>
               </div>
-              <p className="text-gray-600 text-lg italic mb-6 leading-relaxed">"{reviews[currentReview].text}"</p>
-              <div>
-                <h4 className="font-bold text-gray-800 uppercase tracking-wide">{reviews[currentReview].name}</h4>
-                <span className="text-xs text-gray-500">{reviews[currentReview].role}</span>
-              </div>
-            </div>
-          </div>
 
-          <div className="flex justify-center gap-2 mt-8">
-            {reviews.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentReview(idx)}
-                className={`w-3 h-3 rounded-full transition-all duration-300 ${idx === currentReview ? 'bg-[#e31e24] w-6' : 'bg-gray-300 hover:bg-gray-400'}`}
-              />
-            ))}
-          </div>
+              {reviews.length > 1 && (
+                <div className="flex justify-center gap-2 mt-8">
+                  {reviews.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentReview(idx)}
+                      className={`w-3 h-3 rounded-full transition-all duration-300 ${idx === currentReview ? 'bg-[#EE6348] w-6' : 'bg-gray-300 hover:bg-gray-400'}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -203,8 +276,14 @@ const App: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState<{ email: string; name: string } | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    const saved = localStorage.getItem('veena_user');
+    return saved ? true : false;
+  });
+  const [user, setUser] = useState<{ email: string; name: string; picture?: string } | null>(() => {
+    const saved = localStorage.getItem('veena_user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [showReviewModal, setShowReviewModal] = useState(false);
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
@@ -384,6 +463,17 @@ const App: React.FC = () => {
     setCart(prev => prev.filter(item => !(item.id === id && item.variationId === variationId)));
   };
 
+  const updateCartQuantity = (id: number, variationId: number | undefined, change: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === id && item.variationId === variationId) {
+        const newQty = item.quantity + change;
+        if (newQty <= 0) return item; // Don't allow 0 or negative
+        return { ...item, quantity: newQty };
+      }
+      return item;
+    }));
+  };
+
   const toggleWishlist = (product: Product) => {
     setWishlist(prev => {
       const exists = prev.find(p => p.id === product.id);
@@ -440,15 +530,56 @@ const App: React.FC = () => {
 
   // --- Views ---
 
+  const [lastOrderId, setLastOrderId] = useState<string>('');
+
   const CheckoutView = () => {
     const [couponInput, setCouponInput] = useState('');
     const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountAmount: number } | null>(null);
     const [couponError, setCouponError] = useState('');
     const [couponLoading, setCouponLoading] = useState(false);
+    const [paymentGateways, setPaymentGateways] = useState<Array<{ id: string; title: string; description: string }>>([]);
+    const [selectedPayment, setSelectedPayment] = useState<string>('');
+    const [loadingGateways, setLoadingGateways] = useState(true);
+    const [placingOrder, setPlacingOrder] = useState(false);
+    const [orderError, setOrderError] = useState('');
+
+    // Billing form state
+    const [billing, setBilling] = useState({
+      first_name: '',
+      last_name: '',
+      company: '',
+      address_1: '',
+      city: '',
+      phone: '',
+      email: ''
+    });
+
+    const handleBillingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setBilling(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
 
     const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
     const discount = appliedCoupon ? Math.min(appliedCoupon.discountAmount, subtotal) : 0;
     const total = Math.max(0, subtotal - discount);
+
+    // Fetch payment gateways
+    useEffect(() => {
+      const fetchGateways = async () => {
+        setLoadingGateways(true);
+        try {
+          const gateways = await api.getPaymentGateways();
+          setPaymentGateways(gateways);
+          if (gateways.length > 0) {
+            setSelectedPayment(gateways[0].id);
+          }
+        } catch (error) {
+          console.error("Failed to fetch payment gateways:", error);
+        } finally {
+          setLoadingGateways(false);
+        }
+      };
+      fetchGateways();
+    }, []);
 
     const handleApplyCoupon = async () => {
       const code = couponInput.trim();
@@ -475,12 +606,46 @@ const App: React.FC = () => {
       setCouponError('');
     };
 
-    const handlePlaceOrder = (e: React.FormEvent) => {
+    const handlePlaceOrder = async (e: React.FormEvent) => {
       e.preventDefault();
-      setToast({ message: "Order placed successfully! (Demo)", visible: true });
-      setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
-      setCart([]);
-      handleNavigate('home');
+      setOrderError('');
+
+      if (!selectedPayment) {
+        setToast({ message: "Please select a payment method", visible: true });
+        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+        return;
+      }
+
+      setPlacingOrder(true);
+
+      try {
+        // Get payment method title
+        const paymentMethod = paymentGateways.find(g => g.id === selectedPayment);
+
+        // Create order in WooCommerce
+        const order = await api.createOrder({
+          billing: billing,
+          line_items: cart.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity,
+            variation_id: item.variationId
+          })),
+          payment_method: selectedPayment,
+          payment_method_title: paymentMethod?.title || selectedPayment,
+          coupon_lines: appliedCoupon ? [{ code: appliedCoupon.code }] : undefined
+        });
+
+        setLastOrderId(order.id.toString());
+        setCart([]);
+        handleNavigate('thank-you');
+      } catch (error) {
+        console.error("Order creation failed:", error);
+        setOrderError('Failed to place order. Please try again.');
+        setToast({ message: "Failed to place order. Please try again.", visible: true });
+        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+      } finally {
+        setPlacingOrder(false);
+      }
     };
 
     return (
@@ -493,33 +658,83 @@ const App: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">First Name *</label>
-                  <input type="text" required className="w-full border p-2 text-sm" />
+                  <input
+                    type="text"
+                    name="first_name"
+                    value={billing.first_name}
+                    onChange={handleBillingChange}
+                    required
+                    className="w-full border p-2 text-sm"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Last Name *</label>
-                  <input type="text" required className="w-full border p-2 text-sm" />
+                  <input
+                    type="text"
+                    name="last_name"
+                    value={billing.last_name}
+                    onChange={handleBillingChange}
+                    required
+                    className="w-full border p-2 text-sm"
+                  />
                 </div>
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Company Name</label>
-                <input type="text" className="w-full border p-2 text-sm" />
+                <input
+                  type="text"
+                  name="company"
+                  value={billing.company}
+                  onChange={handleBillingChange}
+                  className="w-full border p-2 text-sm"
+                />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Street Address *</label>
-                <input type="text" required className="w-full border p-2 text-sm" placeholder="House number and street name" />
+                <input
+                  type="text"
+                  name="address_1"
+                  value={billing.address_1}
+                  onChange={handleBillingChange}
+                  required
+                  className="w-full border p-2 text-sm"
+                  placeholder="House number and street name"
+                />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Town / City *</label>
-                <input type="text" required className="w-full border p-2 text-sm" />
+                <input
+                  type="text"
+                  name="city"
+                  value={billing.city}
+                  onChange={handleBillingChange}
+                  required
+                  className="w-full border p-2 text-sm"
+                />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Phone *</label>
-                <input type="tel" required className="w-full border p-2 text-sm" />
+                <input
+                  type="tel"
+                  name="phone"
+                  value={billing.phone}
+                  onChange={handleBillingChange}
+                  required
+                  className="w-full border p-2 text-sm"
+                />
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Email Address *</label>
-                <input type="email" required className="w-full border p-2 text-sm" />
+                <input
+                  type="email"
+                  name="email"
+                  value={billing.email}
+                  onChange={handleBillingChange}
+                  required
+                  className="w-full border p-2 text-sm"
+                />
               </div>
+              {orderError && <p className="text-red-600 text-sm">{orderError}</p>}
             </form>
           </div>
           <div className="w-full lg:w-1/3">
@@ -546,7 +761,7 @@ const App: React.FC = () => {
                 {appliedCoupon ? (
                   <div className="flex justify-between items-center flex-wrap gap-2">
                     <span className="text-sm text-green-700">Discount ({appliedCoupon.code}): -${discount.toFixed(2)}</span>
-                    <button type="button" onClick={handleRemoveCoupon} className="text-xs text-[#f10044] hover:underline">Remove</button>
+                    <button type="button" onClick={handleRemoveCoupon} className="text-xs text-[#EE6348] hover:underline">Remove</button>
                   </div>
                 ) : (
                   <div className="flex gap-2 flex-wrap">
@@ -570,11 +785,58 @@ const App: React.FC = () => {
                 )}
                 {couponError && <p className="text-red-600 text-xs mt-1">{couponError}</p>}
               </div>
+
+              {/* Payment Methods */}
+              <div className="border-b border-gray-200 pb-4 mb-4">
+                <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <CreditCard size={16} className="text-gray-500" />
+                  Payment Method
+                </h4>
+                {loadingGateways ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 size={20} className="animate-spin text-[#EE6348]" />
+                  </div>
+                ) : paymentGateways.length > 0 ? (
+                  <div className="space-y-3">
+                    {paymentGateways.map((gateway) => (
+                      <label
+                        key={gateway.id}
+                        className={`flex items-start gap-3 p-3 border rounded cursor-pointer transition ${selectedPayment === gateway.id ? 'border-[#EE6348] bg-orange-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="payment_method"
+                          value={gateway.id}
+                          checked={selectedPayment === gateway.id}
+                          onChange={() => setSelectedPayment(gateway.id)}
+                          className="mt-1 accent-[#EE6348]"
+                        />
+                        <div>
+                          <span className="text-sm font-bold text-gray-800">{gateway.title}</span>
+                          {gateway.description && (
+                            <p className="text-xs text-gray-500 mt-1">{gateway.description}</p>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No payment methods available.</p>
+                )}
+              </div>
+
               <div className="flex justify-between font-bold text-gray-800 text-lg border-t border-gray-200 pt-4 mb-6">
                 <span>Total</span>
-                <span className="text-[#f10044]">${total.toFixed(2)}</span>
+                <span className="text-[#EE6348]">${total.toFixed(2)}</span>
               </div>
-              <button type="submit" form="checkout-form" className="w-full bg-[#f10044] text-white font-bold uppercase py-3 hover:bg-black transition">Place Order</button>
+              <button
+                type="submit"
+                form="checkout-form"
+                disabled={placingOrder || !selectedPayment}
+                className="w-full bg-[#EE6348] text-white font-bold uppercase py-3 hover:bg-black transition disabled:opacity-50 flex items-center justify-center"
+              >
+                {placingOrder ? <><Loader2 size={18} className="animate-spin mr-2" /> Processing...</> : 'Place Order'}
+              </button>
             </div>
           </div>
         </div>
@@ -582,16 +844,116 @@ const App: React.FC = () => {
     );
   };
 
+  const ThankYouView = () => (
+    <div className="container mx-auto px-4 py-16">
+      <div className="max-w-2xl mx-auto text-center">
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Check size={40} className="text-green-600" />
+        </div>
+        <h1 className="text-3xl font-bold uppercase font-heading text-gray-800 mb-4">Thank You!</h1>
+        <p className="text-lg text-gray-600 mb-2">Your order has been placed successfully.</p>
+        {lastOrderId && (
+          <p className="text-sm text-gray-500 mb-8">Order ID: <span className="font-bold text-[#EE6348]">{lastOrderId}</span></p>
+        )}
+
+        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-8">
+          <h3 className="font-bold text-gray-800 mb-2">What happens next?</h3>
+          <ul className="text-sm text-gray-600 space-y-2 text-left">
+            <li className="flex items-start gap-2">
+              <Check size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
+              You will receive an order confirmation email shortly.
+            </li>
+            <li className="flex items-start gap-2">
+              <Check size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
+              Our team will process your order within 24 hours.
+            </li>
+            <li className="flex items-start gap-2">
+              <Check size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
+              You can track your order status in your account.
+            </li>
+          </ul>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            onClick={() => handleNavigate('shop')}
+            className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 hover:bg-black transition"
+          >
+            Continue Shopping
+          </button>
+          <button
+            onClick={() => handleNavigate('track-order')}
+            className="border-2 border-[#EE6348] text-[#EE6348] font-bold uppercase px-8 py-3 hover:bg-[#EE6348] hover:text-white transition"
+          >
+            Track Order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const AccountView = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
+    const [orderTracking, setOrderTracking] = useState<Record<number, Array<{
+      tracking_number: string;
+      tracking_provider: string;
+      tracking_link: string;
+      date_shipped: string;
+      status?: string;
+    }>>>({});
+    const [customerAddresses, setCustomerAddresses] = useState<{
+      billing: {
+        first_name: string;
+        last_name: string;
+        company: string;
+        address_1: string;
+        address_2: string;
+        city: string;
+        state: string;
+        postcode: string;
+        country: string;
+        email: string;
+        phone: string;
+      };
+      shipping: {
+        first_name: string;
+        last_name: string;
+        company: string;
+        address_1: string;
+        address_2: string;
+        city: string;
+        state: string;
+        postcode: string;
+        country: string;
+      };
+    } | null>(null);
+    const [loadingAddresses, setLoadingAddresses] = useState(false);
 
     useEffect(() => {
       if (accountTab === 'orders') {
         setLoadingOrders(true);
-        api.getOrders().then(setOrders).finally(() => setLoadingOrders(false));
+        api.getOrders().then(async (fetchedOrders) => {
+          setOrders(fetchedOrders);
+          // Fetch tracking for each order
+          const trackingData: Record<number, any[]> = {};
+          await Promise.all(fetchedOrders.map(async (order) => {
+            const tracking = await api.getShipmentTracking(order.id);
+            if (tracking.length > 0) {
+              trackingData[order.id] = tracking;
+            }
+          }));
+          setOrderTracking(trackingData);
+        }).finally(() => setLoadingOrders(false));
       }
     }, [accountTab]);
+
+    useEffect(() => {
+      if (accountTab === 'addresses' && user?.email) {
+        setLoadingAddresses(true);
+        api.getCustomerByEmail(user.email).then(setCustomerAddresses).finally(() => setLoadingAddresses(false));
+      }
+    }, [accountTab, user?.email]);
 
     return (
       <div className="container mx-auto px-4 py-8">
@@ -603,24 +965,24 @@ const App: React.FC = () => {
             <nav className="flex flex-col border border-gray-200 bg-white">
               <button
                 onClick={() => setAccountTab('dashboard')}
-                className={`flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 border-b border-gray-100 transition ${accountTab === 'dashboard' ? 'text-[#f10044] border-l-4 border-l-[#f10044]' : 'text-gray-600'}`}
+                className={`flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 border-b border-gray-100 transition ${accountTab === 'dashboard' ? 'text-[#EE6348] border-l-4 border-l-[#EE6348]' : 'text-gray-600'}`}
               >
                 <User size={16} className="mr-3" /> Dashboard
               </button>
               <button
                 onClick={() => setAccountTab('orders')}
-                className={`flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 border-b border-gray-100 transition ${accountTab === 'orders' ? 'text-[#f10044] border-l-4 border-l-[#f10044]' : 'text-gray-600'}`}
+                className={`flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 border-b border-gray-100 transition ${accountTab === 'orders' ? 'text-[#EE6348] border-l-4 border-l-[#EE6348]' : 'text-gray-600'}`}
               >
                 <Package size={16} className="mr-3" /> Orders
               </button>
               <button
                 onClick={() => setAccountTab('addresses')}
-                className={`flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 border-b border-gray-100 transition ${accountTab === 'addresses' ? 'text-[#f10044] border-l-4 border-l-[#f10044]' : 'text-gray-600'}`}
+                className={`flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 border-b border-gray-100 transition ${accountTab === 'addresses' ? 'text-[#EE6348] border-l-4 border-l-[#EE6348]' : 'text-gray-600'}`}
               >
                 <MapPin size={16} className="mr-3" /> Addresses
               </button>
               <button
-                onClick={() => { googleLogout(); setUser(null); setIsLoggedIn(false); handleNavigate('home'); }}
+                onClick={() => { googleLogout(); setUser(null); setIsLoggedIn(false); localStorage.removeItem('veena_user'); handleNavigate('home'); }}
                 className="flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 text-gray-600"
               >
                 <LogOut size={16} className="mr-3" /> Logout
@@ -632,11 +994,23 @@ const App: React.FC = () => {
           <div className="flex-1 bg-white border border-gray-200 p-6 min-h-[400px]">
             {accountTab === 'dashboard' && (
               <div>
-                <h2 className="text-lg font-bold text-gray-800 mb-4">Hello, {user?.name || 'User'}</h2>
+                <div className="flex items-center gap-4 mb-6">
+                  {user?.picture ? (
+                    <img src={user.picture} alt={user.name} className="w-16 h-16 rounded-full border-2 border-[#EE6348]" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-[#EE6348] flex items-center justify-center text-white text-2xl font-bold">
+                      {user?.name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                  )}
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800">Hello, {user?.name || 'User'}</h2>
+                    <p className="text-sm text-gray-500">{user?.email}</p>
+                  </div>
+                </div>
                 <p className="text-gray-600 text-sm mb-4">
-                  From your account dashboard you can view your <span className="text-[#f10044] cursor-pointer" onClick={() => setAccountTab('orders')}>recent orders</span>,
-                  manage your <span className="text-[#f10044] cursor-pointer" onClick={() => setAccountTab('addresses')}>shipping and billing addresses</span>,
-                  and <span className="text-[#f10044] cursor-pointer">edit your password and account details</span>.
+                  From your account dashboard you can view your <span className="text-[#EE6348] cursor-pointer" onClick={() => setAccountTab('orders')}>recent orders</span>,
+                  manage your <span className="text-[#EE6348] cursor-pointer" onClick={() => setAccountTab('addresses')}>shipping and billing addresses</span>,
+                  and <span className="text-[#EE6348] cursor-pointer">edit your password and account details</span>.
                 </p>
               </div>
             )}
@@ -645,7 +1019,7 @@ const App: React.FC = () => {
               <div>
                 <h2 className="text-lg font-bold text-gray-800 mb-6">Recent Orders</h2>
                 {loadingOrders ? (
-                  <div className="flex justify-center py-8"><Loader2 className="animate-spin text-[#f10044]" /></div>
+                  <div className="flex justify-center py-8"><Loader2 className="animate-spin text-[#EE6348]" /></div>
                 ) : orders.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -655,21 +1029,51 @@ const App: React.FC = () => {
                           <th className="p-3">Date</th>
                           <th className="p-3">Status</th>
                           <th className="p-3">Total</th>
+                          <th className="p-3">Tracking</th>
                           <th className="p-3">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {orders.map(order => (
-                          <tr key={order.id} className="hover:bg-gray-50">
-                            <td className="p-3 font-bold text-[#f10044]">#{order.id}</td>
-                            <td className="p-3 text-gray-600">{new Date(order.date_created).toLocaleDateString()}</td>
-                            <td className="p-3"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${order.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.status}</span></td>
-                            <td className="p-3 font-bold text-gray-700">${order.total}</td>
-                            <td className="p-3">
-                              <button className="bg-[#f10044] text-white px-3 py-1 text-xs rounded hover:bg-black transition">View</button>
-                            </td>
-                          </tr>
-                        ))}
+                        {orders.map(order => {
+                          const tracking = orderTracking[order.id];
+                          return (
+                            <tr key={order.id} className="hover:bg-gray-50">
+                              <td className="p-3 font-bold text-[#EE6348]">#{order.id}</td>
+                              <td className="p-3 text-gray-600">{new Date(order.date_created).toLocaleDateString()}</td>
+                              <td className="p-3"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${order.status === 'completed' ? 'bg-green-100 text-green-700' : order.status === 'shipped' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.status}</span></td>
+                              <td className="p-3 font-bold text-gray-700">${order.total}</td>
+                              <td className="p-3">
+                                {tracking && tracking.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {tracking.map((t, idx) => (
+                                      <div key={idx} className="text-xs">
+                                        <div className="text-gray-600">
+                                          <span className="font-bold">{t.tracking_provider}</span>
+                                        </div>
+                                        <div className="text-gray-500">{t.tracking_number}</div>
+                                        {t.tracking_link && (
+                                          <a
+                                            href={t.tracking_link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-[#EE6348] font-bold hover:underline mt-1"
+                                          >
+                                            <Truck size={12} /> Track
+                                          </a>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 text-xs italic">Not shipped</span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <button className="bg-[#EE6348] text-white px-3 py-1 text-xs rounded hover:bg-black transition">View</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -685,16 +1089,58 @@ const App: React.FC = () => {
               <div>
                 <h2 className="text-lg font-bold text-gray-800 mb-6">Addresses</h2>
                 <p className="text-gray-600 text-sm mb-6">The following addresses will be used on the checkout page by default.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="border p-4 rounded bg-gray-50">
-                    <h3 className="font-bold text-gray-700 mb-2 flex justify-between">Billing Address <span className="text-[#f10044] text-xs cursor-pointer">Edit</span></h3>
-                    <p className="text-sm text-gray-500 italic">You have not set up this type of address yet.</p>
+                {loadingAddresses ? (
+                  <div className="flex justify-center py-8"><Loader2 className="animate-spin text-[#EE6348]" /></div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="border p-4 rounded bg-gray-50">
+                      <h3 className="font-bold text-gray-700 mb-3 flex justify-between items-center">
+                        Billing Address
+                        <span className="text-[#EE6348] text-xs cursor-pointer hover:underline">Edit</span>
+                      </h3>
+                      {customerAddresses?.billing?.address_1 ? (
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p className="font-medium">{customerAddresses.billing.first_name} {customerAddresses.billing.last_name}</p>
+                          {customerAddresses.billing.company && <p>{customerAddresses.billing.company}</p>}
+                          <p>{customerAddresses.billing.address_1}</p>
+                          {customerAddresses.billing.address_2 && <p>{customerAddresses.billing.address_2}</p>}
+                          <p>{customerAddresses.billing.city}{customerAddresses.billing.state ? `, ${customerAddresses.billing.state}` : ''} {customerAddresses.billing.postcode}</p>
+                          <p>{customerAddresses.billing.country}</p>
+                          {customerAddresses.billing.phone && (
+                            <p className="flex items-center gap-1 mt-2">
+                              <Phone size={12} /> {customerAddresses.billing.phone}
+                            </p>
+                          )}
+                          {customerAddresses.billing.email && (
+                            <p className="flex items-center gap-1">
+                              <Mail size={12} /> {customerAddresses.billing.email}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">You have not set up this type of address yet.</p>
+                      )}
+                    </div>
+                    <div className="border p-4 rounded bg-gray-50">
+                      <h3 className="font-bold text-gray-700 mb-3 flex justify-between items-center">
+                        Shipping Address
+                        <span className="text-[#EE6348] text-xs cursor-pointer hover:underline">Edit</span>
+                      </h3>
+                      {customerAddresses?.shipping?.address_1 ? (
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p className="font-medium">{customerAddresses.shipping.first_name} {customerAddresses.shipping.last_name}</p>
+                          {customerAddresses.shipping.company && <p>{customerAddresses.shipping.company}</p>}
+                          <p>{customerAddresses.shipping.address_1}</p>
+                          {customerAddresses.shipping.address_2 && <p>{customerAddresses.shipping.address_2}</p>}
+                          <p>{customerAddresses.shipping.city}{customerAddresses.shipping.state ? `, ${customerAddresses.shipping.state}` : ''} {customerAddresses.shipping.postcode}</p>
+                          <p>{customerAddresses.shipping.country}</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 italic">You have not set up this type of address yet.</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="border p-4 rounded bg-gray-50">
-                    <h3 className="font-bold text-gray-700 mb-2 flex justify-between">Shipping Address <span className="text-[#f10044] text-xs cursor-pointer">Edit</span></h3>
-                    <p className="text-sm text-gray-500 italic">You have not set up this type of address yet.</p>
-                  </div>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -719,17 +1165,17 @@ const App: React.FC = () => {
     return (
       <div className="container mx-auto px-4 py-12">
         {loadingPage ? (
-          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#f10044]" size={40} /></div>
+          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#EE6348]" size={40} /></div>
         ) : pageData ? (
           <div className="max-w-4xl mx-auto bg-white p-8 border border-gray-100 shadow-sm">
-            <h1 className="text-3xl font-bold uppercase font-heading text-gray-800 mb-8 pb-4 border-b border-[#f10044] inline-block">{pageData.title}</h1>
+            <h1 className="text-3xl font-bold uppercase font-heading text-gray-800 mb-8 pb-4 border-b border-[#EE6348] inline-block">{pageData.title}</h1>
             <div className="prose prose-sm md:prose-base max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: pageData.content }} />
           </div>
         ) : (
           <div className="text-center py-12">
             <h2 className="text-xl font-bold text-gray-800">Page Not Found</h2>
             <p className="text-gray-500 mt-2">The page "{currentPageSlug}" could not be loaded.</p>
-            <button onClick={() => handleNavigate('home')} className="mt-4 text-[#f10044] font-bold underline">Return Home</button>
+            <button onClick={() => handleNavigate('home')} className="mt-4 text-[#EE6348] font-bold underline">Return Home</button>
           </div>
         )}
       </div>
@@ -740,6 +1186,13 @@ const App: React.FC = () => {
     const [orderId, setOrderId] = useState('');
     const [billingEmail, setBillingEmail] = useState('');
     const [trackingResult, setTrackingResult] = useState<Order | null>(null);
+    const [shipmentTracking, setShipmentTracking] = useState<Array<{
+      tracking_number: string;
+      tracking_provider: string;
+      tracking_link: string;
+      date_shipped: string;
+      status?: string;
+    }>>([]);
     const [trackingError, setTrackingError] = useState('');
     const [isTracking, setIsTracking] = useState(false);
 
@@ -748,24 +1201,42 @@ const App: React.FC = () => {
       setIsTracking(true);
       setTrackingError('');
       setTrackingResult(null);
+      setShipmentTracking([]);
 
       try {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        const orderIdNum = parseInt(orderId);
+        if (isNaN(orderIdNum)) {
+          setTrackingError('Please enter a valid Order ID.');
+          return;
+        }
 
-        // Mock finding an order from the API.orders mock data
-        const orders = await api.getOrders();
-        const found = orders.find(o => o.id.toString() === orderId);
+        // Fetch order from WooCommerce
+        const order = await api.getOrderById(orderIdNum, billingEmail);
 
-        if (found) {
-          setTrackingResult(found);
+        if (order) {
+          setTrackingResult(order);
+
+          // Fetch shipment tracking from AST Pro
+          const tracking = await api.getShipmentTracking(orderIdNum);
+          setShipmentTracking(tracking);
         } else {
-          setTrackingError(`Could not find order #${orderId}. Please check the Order ID and try again.`);
+          setTrackingError(`Could not find order #${orderId}. Please check the Order ID and billing email.`);
         }
       } catch (err) {
         setTrackingError("An error occurred while tracking. Please try again.");
       } finally {
         setIsTracking(false);
+      }
+    };
+
+    const getStatusColor = (status: string) => {
+      switch (status.toLowerCase()) {
+        case 'completed': return 'bg-green-100 text-green-700';
+        case 'processing': return 'bg-blue-100 text-blue-700';
+        case 'on-hold': return 'bg-yellow-100 text-yellow-700';
+        case 'pending': return 'bg-gray-100 text-gray-700';
+        case 'cancelled': case 'failed': return 'bg-red-100 text-red-700';
+        default: return 'bg-gray-100 text-gray-700';
       }
     };
 
@@ -787,10 +1258,9 @@ const App: React.FC = () => {
                 required
                 value={orderId}
                 onChange={(e) => setOrderId(e.target.value)}
-                className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#f10044]"
+                className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348]"
                 placeholder="Found in your order confirmation email."
               />
-              <p className="text-xs text-gray-400 mt-1">Try using ID <strong>1024</strong> or <strong>998</strong> for this demo.</p>
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Billing Email</label>
@@ -799,14 +1269,14 @@ const App: React.FC = () => {
                 required
                 value={billingEmail}
                 onChange={(e) => setBillingEmail(e.target.value)}
-                className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#f10044]"
+                className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348]"
                 placeholder="Email you used during checkout."
               />
             </div>
             <button
               type="submit"
               disabled={isTracking}
-              className="bg-[#f10044] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm disabled:opacity-50 flex items-center"
+              className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm disabled:opacity-50 flex items-center"
             >
               {isTracking ? <><Loader2 className="animate-spin mr-2" size={16} /> Tracking...</> : 'Track'}
             </button>
@@ -824,9 +1294,11 @@ const App: React.FC = () => {
                 <Check size={20} className="text-green-600 mr-2" /> Order #{trackingResult.id} Found
               </h3>
               <div className="bg-gray-50 p-6 rounded text-sm space-y-3">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-gray-600">Status:</span>
-                  <span className="font-bold uppercase text-[#f10044]">{trackingResult.status}</span>
+                  <span className={`font-bold uppercase text-xs px-3 py-1 rounded ${getStatusColor(trackingResult.status)}`}>
+                    {trackingResult.status}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Date:</span>
@@ -845,6 +1317,59 @@ const App: React.FC = () => {
                   </ul>
                 </div>
               </div>
+
+              {/* Shipment Tracking Section */}
+              {shipmentTracking.length > 0 && (
+                <div className="mt-6 bg-blue-50 p-6 rounded border border-blue-100">
+                  <h4 className="font-bold text-gray-800 mb-4 flex items-center">
+                    <Package size={18} className="mr-2 text-blue-600" /> Shipment Tracking
+                  </h4>
+                  <div className="space-y-4">
+                    {shipmentTracking.map((tracking, idx) => (
+                      <div key={idx} className="bg-white p-4 rounded border border-blue-100">
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-gray-500">Carrier:</span>
+                            <p className="font-bold text-gray-800">{tracking.tracking_provider}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Tracking Number:</span>
+                            <p className="font-bold text-gray-800">{tracking.tracking_number}</p>
+                          </div>
+                          {tracking.date_shipped && (
+                            <div>
+                              <span className="text-gray-500">Shipped Date:</span>
+                              <p className="font-bold text-gray-800">{new Date(tracking.date_shipped).toLocaleDateString()}</p>
+                            </div>
+                          )}
+                          {tracking.status && (
+                            <div>
+                              <span className="text-gray-500">Status:</span>
+                              <p className="font-bold text-green-600">{tracking.status}</p>
+                            </div>
+                          )}
+                        </div>
+                        {tracking.tracking_link && (
+                          <a
+                            href={tracking.tracking_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-3 inline-flex items-center text-sm text-[#EE6348] font-bold hover:underline"
+                          >
+                            Track Package <ArrowRight size={14} className="ml-1" />
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {shipmentTracking.length === 0 && trackingResult.status !== 'completed' && (
+                <div className="mt-6 bg-yellow-50 p-4 rounded border border-yellow-100 text-sm text-yellow-800">
+                  <p>Tracking information will be available once your order has been shipped.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -892,7 +1417,7 @@ const App: React.FC = () => {
     return (
       <>
         {/* Hero Slider */}
-        <div className="relative h-[500px] w-full bg-[#111] overflow-hidden mb-12">
+        <div className="relative h-[500px] w-full bg-[#111] overflow-hidden">
           {slides.map((slide, index) => (
             <div
               key={slide.id}
@@ -909,12 +1434,12 @@ const App: React.FC = () => {
                   <span className="uppercase text-sm tracking-widest px-2">{slide.subtitle}</span>
                 </div>
                 <h2 className="text-4xl md:text-6xl font-bold font-heading mb-2 animate-fade-in-up delay-100">{slide.title}</h2>
-                <div className="bg-white/10 backdrop-blur-sm border-l-4 border-[#f10044] px-4 py-2 mb-8 animate-fade-in-up delay-200">
+                <div className="bg-white/10 backdrop-blur-sm border-l-4 border-[#EE6348] px-4 py-2 mb-8 animate-fade-in-up delay-200">
                   <span className="text-xl tracking-wide uppercase">{slide.discount}</span>
                 </div>
                 <button
                   onClick={() => handleNavigate('shop')}
-                  className="bg-[#f10044] text-white hover:bg-[#d1003a] transition font-bold uppercase px-8 py-3 text-sm tracking-wider shadow-lg animate-fade-in-up delay-300"
+                  className="bg-[#EE6348] text-white hover:bg-[#EE6348] transition font-bold uppercase px-8 py-3 text-sm tracking-wider shadow-lg animate-fade-in-up delay-300"
                 >
                   Shop Now
                 </button>
@@ -928,7 +1453,7 @@ const App: React.FC = () => {
               <button
                 key={idx}
                 onClick={() => setCurrentSlide(idx)}
-                className={`w-3 h-3 rounded-full transition-colors duration-300 ${idx === currentSlide ? 'bg-[#f10044]' : 'bg-white/50 hover:bg-white'}`}
+                className={`w-3 h-3 rounded-full transition-colors duration-300 ${idx === currentSlide ? 'bg-[#EE6348]' : 'bg-white/50 hover:bg-white'}`}
               />
             ))}
           </div>
@@ -937,18 +1462,18 @@ const App: React.FC = () => {
         {/* Deal of the Day (Replaces Welcome Section) */}
         <DealOfTheDay
           onNavigate={handleNavigate}
-          products={products}
           onProductClick={handleProductClick}
           onAddToCart={addToCart}
           onToggleWishlist={toggleWishlist}
           isInWishlist={isInWishlist}
+          onQuickView={handleQuickView}
         />
 
         {/* Categories Grid */}
         <div className="container mx-auto px-4 mb-16">
           <div className="text-center mb-10">
             <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Categories</h3>
-            <div className="w-12 h-0.5 bg-[#f10044] mx-auto mt-4"></div>
+            <div className="w-12 h-0.5 bg-[#EE6348] mx-auto mt-4"></div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {categories.map(cat => (
@@ -965,7 +1490,7 @@ const App: React.FC = () => {
 
                 {/* Title Slide Up Animation - Visible on mobile, hover effect on desktop */}
                 <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-100 lg:opacity-0 lg:-translate-y-[40%] lg:group-hover:opacity-100 lg:group-hover:-translate-y-1/2 transition-all duration-300 ease-out z-10 w-full flex justify-center pointer-events-none">
-                  <div className="bg-[#f10044] text-white font-bold uppercase py-2 px-1 min-w-[200px] text-center shadow-lg hover:bg-[#d1003a] transition-colors pointer-events-auto">
+                  <div className="bg-[#EE6348] text-white font-bold uppercase py-2 px-1 min-w-[200px] text-center shadow-lg hover:bg-[#EE6348] transition-colors pointer-events-auto">
                     {cat.name}
                   </div>
                 </div>
@@ -975,11 +1500,11 @@ const App: React.FC = () => {
         </div>
 
         {/* Best Sellers */}
-        <div className="bg-[#f6f6f6] py-16 mb-16">
+        <div className="bg-[#B8A99A] py-16 mb-16">
           <div className="container mx-auto px-4">
             <div className="text-center mb-10">
-              <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Best Sellers</h3>
-              <div className="w-12 h-0.5 bg-[#f10044] mx-auto mt-4"></div>
+              <h3 className="text-xl font-bold uppercase tracking-widest text-black">Best Sellers</h3>
+              <div className="w-12 h-0.5 bg-[#EE6348] mx-auto mt-4"></div>
             </div>
 
             <div className="relative">
@@ -1008,7 +1533,7 @@ const App: React.FC = () => {
         <div className="container mx-auto px-4 text-center pt-6 pb-12">
           <button
             onClick={() => setShowReviewModal(true)}
-            className="bg-[#e31e24] text-white font-bold uppercase px-8 py-3 hover:bg-[#c41a1f] transition"
+            className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 hover:bg-[#EE6348] transition"
           >
             Write a Review
           </button>
@@ -1094,7 +1619,7 @@ const App: React.FC = () => {
           <span className="font-bold text-gray-700">Shop</span>
         </div>
 
-        <div className="mb-8 bg-gray-100 py-12 px-6 text-center border-b-4 border-[#f10044]">
+        <div className="mb-8 bg-gray-100 py-12 px-6 text-center border-b-4 border-[#EE6348]">
           <h1 className="text-4xl font-bold uppercase font-heading text-gray-800 tracking-wider">{currentCategory || "All Products"}</h1>
           <p className="text-gray-500 mt-2 text-sm uppercase tracking-widest">Explore our exclusive collection</p>
         </div>
@@ -1115,7 +1640,7 @@ const App: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Sort by</span>
                 <select
-                  className="border border-gray-300 p-1.5 text-sm text-gray-600 focus:outline-none focus:border-[#f10044]"
+                  className="border border-gray-300 p-1.5 text-sm text-gray-600 focus:outline-none focus:border-[#EE6348]"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
                 >
@@ -1129,7 +1654,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Display</span>
-                <select className="border border-gray-300 p-1.5 text-sm text-gray-600 focus:outline-none focus:border-[#f10044]">
+                <select className="border border-gray-300 p-1.5 text-sm text-gray-600 focus:outline-none focus:border-[#EE6348]">
                   <option>6</option>
                   <option>9</option>
                   <option>12</option>
@@ -1173,7 +1698,7 @@ const App: React.FC = () => {
         <div className="flex items-center text-xs text-gray-500 mb-8">
           <Home size={12} className="mr-1" cursor="pointer" onClick={() => handleNavigate('home')} />
           <span className="mx-1">/</span>
-          <span className="cursor-pointer hover:text-[#f10044]" onClick={() => handleNavigate('shop')}>{activeProduct.category}</span>
+          <span className="cursor-pointer hover:text-[#EE6348]" onClick={() => handleNavigate('shop')}>{activeProduct.category}</span>
           <span className="mx-1">/</span>
           <span className="font-bold text-gray-700">{activeProduct.name}</span>
         </div>
@@ -1181,11 +1706,8 @@ const App: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-12 bg-white p-6 border border-gray-100 mb-12">
           {/* Image */}
           <div className="w-full md:w-1/2">
-            <div className="border border-gray-200 p-4 relative">
+            <div className="border border-gray-200 p-4">
               <img src={displayImage} alt={activeProduct.name} className="w-full h-auto object-contain transition-all duration-300" />
-              <button className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-[#f10044] hover:text-white transition">
-                <Plus size={20} />
-              </button>
             </div>
           </div>
 
@@ -1198,23 +1720,23 @@ const App: React.FC = () => {
 
             <div className="border-t border-b border-gray-100 py-4 mb-6">
               <span className="text-gray-500 text-sm mr-2">Manufacturer:</span>
-              <span className="text-[#f10044]">Rado</span>
+              <span className="text-[#EE6348]">Rado</span>
             </div>
 
             <div className="mb-6">
-              <span className="text-3xl font-bold text-[#f10044]">${displayPrice.toFixed(2)}</span>
+              <span className="text-3xl font-bold text-[#EE6348]">${displayPrice.toFixed(2)}</span>
             </div>
 
             {/* Variation Selectors */}
             {activeProduct.type === 'variable' && activeProduct.attributes && (
               <div className="mb-6 space-y-4">
-                {variationLoading && <div className="text-xs text-[#f10044]">Loading variations...</div>}
+                {variationLoading && <div className="text-xs text-[#EE6348]">Loading variations...</div>}
 
                 {activeProduct.attributes.filter(attr => attr.variation).map(attr => (
                   <div key={attr.id} className="flex flex-col">
                     <label className="text-sm font-bold text-gray-700 mb-1">{attr.name}:</label>
                     <select
-                      className="border border-gray-300 p-2 text-sm w-full md:w-1/2 focus:border-[#f10044] outline-none"
+                      className="border border-gray-300 p-2 text-sm w-full md:w-1/2 focus:border-[#EE6348] outline-none"
                       onChange={(e) => setSelectedAttributes(prev => ({ ...prev, [attr.name]: e.target.value }))}
                       value={selectedAttributes[attr.name] || ""}
                     >
@@ -1238,7 +1760,7 @@ const App: React.FC = () => {
               </div>
               <button
                 onClick={() => addToCart(activeProduct)}
-                className={`text-white px-8 py-2.5 font-bold uppercase text-sm transition flex items-center ${(activeProduct.type === 'variable' && !currentVariation) ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#f10044] hover:bg-black'
+                className={`text-white px-8 py-2.5 font-bold uppercase text-sm transition flex items-center ${(activeProduct.type === 'variable' && !currentVariation) ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#EE6348] hover:bg-black'
                   }`}
               >
                 <ShoppingCart size={16} className="mr-2" /> Add to cart
@@ -1248,7 +1770,7 @@ const App: React.FC = () => {
             <div className="flex space-x-2">
               <button
                 onClick={() => toggleWishlist(activeProduct)}
-                className={`px-4 py-2 text-xs flex items-center transition ${isInWishlist(activeProduct.id) ? 'bg-[#f10044] text-white' : 'bg-[#35404f] text-white hover:bg-gray-700'}`}
+                className={`px-4 py-2 text-xs flex items-center transition ${isInWishlist(activeProduct.id) ? 'bg-[#EE6348] text-white' : 'bg-[#35404f] text-white hover:bg-gray-700'}`}
               >
                 <Heart size={12} className="mr-1" fill={isInWishlist(activeProduct.id) ? "currentColor" : "none"} />
                 {isInWishlist(activeProduct.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
@@ -1280,7 +1802,7 @@ const App: React.FC = () => {
         <div className="text-center py-16 bg-gray-50 rounded">
           <Heart size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="text-gray-500 mb-4">Your Wishlist is empty!</p>
-          <button onClick={() => handleNavigate('shop')} className="text-[#f10044] font-bold underline">Go to Shop</button>
+          <button onClick={() => handleNavigate('shop')} className="text-[#EE6348] font-bold underline">Go to Shop</button>
         </div>
       ) : (
         <div className="flex flex-col gap-8">
@@ -1303,7 +1825,7 @@ const App: React.FC = () => {
                     </td>
                     <td className="p-4">
                       <div className="flex flex-col items-start">
-                        <span className="text-[#f10044] text-sm font-bold cursor-pointer hover:underline" onClick={() => handleProductClick(item.id)}>{item.name}</span>
+                        <span className="text-[#EE6348] text-sm font-bold cursor-pointer hover:underline" onClick={() => handleProductClick(item.id)}>{item.name}</span>
                       </div>
                     </td>
                     <td className="p-4 text-sm text-gray-600">${item.price.toFixed(2)}</td>
@@ -1312,7 +1834,7 @@ const App: React.FC = () => {
                       <div className="flex space-x-2">
                         <button
                           onClick={() => { addToCart(item); toggleWishlist(item); }}
-                          className="bg-[#f10044] text-white px-4 py-2 text-xs font-bold uppercase hover:bg-black transition"
+                          className="bg-[#EE6348] text-white px-4 py-2 text-xs font-bold uppercase hover:bg-black transition"
                         >
                           Add to Cart
                         </button>
@@ -1342,7 +1864,7 @@ const App: React.FC = () => {
       {cart.length === 0 ? (
         <div className="text-center py-16 bg-gray-50 rounded">
           <p className="text-gray-500 mb-4">Your Shopping Cart is empty!</p>
-          <button onClick={() => handleNavigate('shop')} className="text-[#f10044] font-bold underline">Go to Shop</button>
+          <button onClick={() => handleNavigate('shop')} className="text-[#EE6348] font-bold underline">Go to Shop</button>
         </div>
       ) : (
         <div className="flex flex-col lg:flex-row gap-8">
@@ -1367,7 +1889,7 @@ const App: React.FC = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col items-start">
-                          <span className="text-[#f10044] text-sm font-bold">{item.name}</span>
+                          <span className="text-[#EE6348] text-sm font-bold">{item.name}</span>
                           {item.selectedAttributes && (
                             <div className="text-xs text-gray-500 mt-1">
                               {Object.entries(item.selectedAttributes).map(([key, val]) => (
@@ -1377,7 +1899,7 @@ const App: React.FC = () => {
                           )}
                           <button
                             onClick={() => removeFromCart(item.id, item.variationId)}
-                            className="text-gray-400 hover:text-[#f10044] text-xs flex items-center mt-1"
+                            className="text-gray-400 hover:text-[#EE6348] text-xs flex items-center mt-1"
                           >
                             <X size={12} className="mr-1" /> Remove
                           </button>
@@ -1385,9 +1907,24 @@ const App: React.FC = () => {
                       </td>
                       <td className="p-4 text-sm text-gray-600">${item.price.toFixed(2)}</td>
                       <td className="p-4">
-                        <input type="text" value={item.quantity} readOnly className="w-10 border text-center text-sm" />
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => updateCartQuantity(item.id, item.variationId, -1)}
+                            className="w-10 h-10 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
+                            disabled={item.quantity <= 1}
+                          >
+                            <Minus size={16} className={item.quantity <= 1 ? 'text-gray-300' : 'text-gray-600'} />
+                          </button>
+                          <span className="w-12 h-10 flex items-center justify-center text-sm font-bold text-gray-700 border-y border-gray-300">{item.quantity}</span>
+                          <button
+                            onClick={() => updateCartQuantity(item.id, item.variationId, 1)}
+                            className="w-10 h-10 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
+                          >
+                            <Plus size={16} className="text-gray-600" />
+                          </button>
+                        </div>
                       </td>
-                      <td className="p-4 text-sm font-bold text-[#f10044]">${(item.price * item.quantity).toFixed(2)}</td>
+                      <td className="p-4 text-sm font-bold text-[#EE6348]">${(item.price * item.quantity).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1404,7 +1941,7 @@ const App: React.FC = () => {
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex justify-between items-start gap-2">
-                        <span className="text-[#f10044] text-sm font-bold line-clamp-2">{item.name}</span>
+                        <span className="text-[#EE6348] text-sm font-bold line-clamp-2">{item.name}</span>
                         <button onClick={() => removeFromCart(item.id, item.variationId)} className="text-gray-400"><X size={18} /></button>
                       </div>
                       {item.selectedAttributes && (
@@ -1416,8 +1953,24 @@ const App: React.FC = () => {
                       )}
                       <div className="text-sm text-gray-500 mt-1">${item.price.toFixed(2)}</div>
                     </div>
-                    <div className="flex justify-between items-end mt-3">
-                      <span className="text-base font-bold text-[#f10044]">${(item.price * item.quantity).toFixed(2)}</span>
+                    <div className="flex justify-between items-center mt-3">
+                      <div className="flex items-center">
+                        <button
+                          onClick={() => updateCartQuantity(item.id, item.variationId, -1)}
+                          className="w-8 h-8 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
+                          disabled={item.quantity <= 1}
+                        >
+                          <Minus size={14} className={item.quantity <= 1 ? 'text-gray-300' : 'text-gray-600'} />
+                        </button>
+                        <span className="w-10 h-8 flex items-center justify-center text-sm font-bold text-gray-700 border-y border-gray-300">{item.quantity}</span>
+                        <button
+                          onClick={() => updateCartQuantity(item.id, item.variationId, 1)}
+                          className="w-8 h-8 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
+                        >
+                          <Plus size={14} className="text-gray-600" />
+                        </button>
+                      </div>
+                      <span className="text-base font-bold text-[#EE6348]">${(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -1425,19 +1978,19 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row justify-between mt-6 gap-3">
-              <button onClick={() => handleNavigate('shop')} className="bg-[#35404f] text-white text-xs font-bold uppercase px-6 py-3 hover:bg-[#f10044] transition w-full sm:w-auto text-center">Continue Shopping</button>
+              <button onClick={() => handleNavigate('shop')} className="bg-[#35404f] text-white text-xs font-bold uppercase px-6 py-3 hover:bg-[#EE6348] transition w-full sm:w-auto text-center">Continue Shopping</button>
             </div>
           </div>
 
           <div className="w-full lg:w-1/3 space-y-6">
             <div className="bg-gray-50 p-6 border shadow-sm">
-              <div className="flex justify-between mb-6 text-lg font-bold text-[#f10044]">
+              <div className="flex justify-between mb-6 text-lg font-bold text-[#EE6348]">
                 <span>Total:</span>
                 <span>${cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toFixed(2)}</span>
               </div>
               <button
                 onClick={() => handleNavigate('checkout')}
-                className="w-full bg-[#f10044] text-white font-bold uppercase py-3 hover:bg-black transition rounded-sm"
+                className="w-full bg-[#EE6348] text-white font-bold uppercase py-3 hover:bg-black transition rounded-sm"
               >
                 Checkout
               </button>
@@ -1456,9 +2009,11 @@ const App: React.FC = () => {
 
     const handleLogin = (e: React.FormEvent) => {
       e.preventDefault();
-      setUser({ email: loginEmail, name: loginEmail.split('@')[0] || 'User' });
+      const userData = { email: loginEmail, name: loginEmail.split('@')[0] || 'User' };
+      setUser(userData);
       setIsLoggedIn(true);
-      setToast({ message: `Welcome back, ${loginEmail}!`, visible: true });
+      localStorage.setItem('veena_user', JSON.stringify(userData));
+      setToast({ message: `Welcome back, ${userData.name}!`, visible: true });
       setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
       handleNavigate('account', 'dashboard');
     };
@@ -1468,8 +2023,10 @@ const App: React.FC = () => {
       setIsRegistering(true);
       setTimeout(() => {
         setIsRegistering(false);
-        setUser({ email: registerEmail, name: registerEmail.split('@')[0] || 'User' });
+        const userData = { email: registerEmail, name: registerEmail.split('@')[0] || 'User' };
+        setUser(userData);
         setIsLoggedIn(true);
+        localStorage.setItem('veena_user', JSON.stringify(userData));
         setToast({ message: "Registration successful! Please check your email.", visible: true });
         setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
         handleNavigate('account', 'dashboard');
@@ -1482,8 +2039,11 @@ const App: React.FC = () => {
         const payload = JSON.parse(atob(credentialResponse.credential.split('.')[1]));
         const name = payload.name || payload.email || 'User';
         const email = payload.email || '';
-        setUser({ name, email });
+        const picture = payload.picture || '';
+        const userData = { name, email, picture };
+        setUser(userData);
         setIsLoggedIn(true);
+        localStorage.setItem('veena_user', JSON.stringify(userData));
         setToast({ message: `Welcome, ${name}!`, visible: true });
         setTimeout(() => setToast(p => ({ ...p, visible: false })), 3000);
         handleNavigate('account', 'dashboard');
@@ -1509,7 +2069,7 @@ const App: React.FC = () => {
                   required
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
-                  className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#f10044] transition"
+                  className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348] transition"
                 />
               </div>
               <div>
@@ -1519,16 +2079,16 @@ const App: React.FC = () => {
                   required
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#f10044] transition"
+                  className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348] transition"
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center text-gray-600 cursor-pointer">
                   <input type="checkbox" className="mr-2" /> Remember me
                 </label>
-                <a href="#" className="text-[#f10044] hover:underline">Lost your password?</a>
+                <a href="#" className="text-[#EE6348] hover:underline">Lost your password?</a>
               </div>
-              <button type="submit" className="bg-[#f10044] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm w-full md:w-auto">
+              <button type="submit" className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm w-full md:w-auto">
                 Log In
               </button>
               {googleClientId && (
@@ -1538,19 +2098,21 @@ const App: React.FC = () => {
                       <div className="w-full border-t border-gray-200" />
                     </div>
                     <div className="relative flex justify-center text-sm">
-                      <span className="px-2 bg-white text-gray-500">Or sign in with Google</span>
+                      <span className="px-2 bg-white text-gray-500">Or continue with</span>
                     </div>
                   </div>
-                  <div className="flex justify-center">
+                  <div className="w-full">
                     <GoogleLogin
                       onSuccess={handleGoogleSuccess}
                       onError={() => {
                         setToast({ message: 'Google sign-in failed. Please try again.', visible: true });
                         setTimeout(() => setToast(p => ({ ...p, visible: false })), 3000);
                       }}
-                      theme="outline"
+                      theme="filled_blue"
                       size="large"
+                      width="100%"
                       text="continue_with"
+                      shape="rectangular"
                     />
                   </div>
                 </>
@@ -1561,6 +2123,35 @@ const App: React.FC = () => {
           {/* Register Form */}
           <div className="bg-white p-8 border border-gray-200 shadow-sm">
             <h2 className="text-xl font-bold uppercase text-gray-800 mb-6">Register</h2>
+
+            {/* Google Sign Up Button */}
+            {googleClientId && (
+              <div className="mb-6">
+                <div className="w-full">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => {
+                      setToast({ message: 'Google sign-up failed. Please try again.', visible: true });
+                      setTimeout(() => setToast(p => ({ ...p, visible: false })), 3000);
+                    }}
+                    theme="filled_blue"
+                    size="large"
+                    width="100%"
+                    text="signup_with"
+                    shape="rectangular"
+                  />
+                </div>
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-200" />
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-white text-gray-500">Or register with email</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleRegister} className="space-y-6">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Email address *</label>
@@ -1569,7 +2160,7 @@ const App: React.FC = () => {
                   required
                   value={registerEmail}
                   onChange={(e) => setRegisterEmail(e.target.value)}
-                  className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#f10044] transition"
+                  className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348] transition"
                 />
               </div>
 
@@ -1577,14 +2168,14 @@ const App: React.FC = () => {
                 <p>A link to set a new password will be sent to your email address.</p>
                 <p>
                   Your personal data will be used to support your experience throughout this website, to manage access to your account, and for other purposes described in our
-                  <a href="#" className="text-[#f10044] font-bold ml-1 hover:underline">privacy policy</a>.
+                  <a href="#" className="text-[#EE6348] font-bold ml-1 hover:underline">privacy policy</a>.
                 </p>
               </div>
 
               <button
                 type="submit"
                 disabled={isRegistering}
-                className="bg-white border-2 border-[#f10044] text-[#f10044] font-bold uppercase px-8 py-3 hover:bg-[#f10044] hover:text-white transition text-sm w-full md:w-auto flex items-center justify-center disabled:opacity-50"
+                className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm w-full flex items-center justify-center disabled:opacity-50"
               >
                 {isRegistering ? <Loader2 className="animate-spin mr-2" size={16} /> : 'Register'}
               </button>
@@ -1608,25 +2199,87 @@ const App: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white text-gray-500 flex-col">
-        <Loader2 size={48} className="animate-spin text-[#f10044] mb-4" />
+        <Loader2 size={48} className="animate-spin text-[#EE6348] mb-4" />
         <p className="uppercase tracking-widest text-xs font-bold">Loading Veena Collections...</p>
       </div>
     );
   }
 
   const DealView = () => {
-    // Filter products with sale price for "Deal of the Day"
-    const dealProducts = products.filter(p => p.sale_price && p.sale_price !== "");
+    const [dealProducts, setDealProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+    const [saleEndDate, setSaleEndDate] = useState<string | null>(null);
+
+    useEffect(() => {
+      const fetchDeals = async () => {
+        setLoading(true);
+        try {
+          const data = await api.getDealProducts();
+          setDealProducts(data.products);
+          setSaleEndDate(data.saleEndDate);
+        } catch (error) {
+          console.error("Failed to fetch deal products:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchDeals();
+    }, []);
+
+    useEffect(() => {
+      if (!saleEndDate) return;
+      const targetDate = new Date(saleEndDate);
+      const interval = setInterval(() => {
+        const now = new Date();
+        const difference = targetDate.getTime() - now.getTime();
+        if (difference > 0) {
+          setTimeLeft({
+            days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+            hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+            minutes: Math.floor((difference / 1000 / 60) % 60),
+            seconds: Math.floor((difference / 1000) % 60)
+          });
+        } else {
+          clearInterval(interval);
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    }, [saleEndDate]);
 
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 bg-gray-100 py-12 px-6 text-center border-b-4 border-[#f10044]">
+        <div className="mb-8 bg-[#B8A99A] py-12 px-6 text-center">
           <h1 className="text-4xl font-bold uppercase font-heading text-gray-800 tracking-wider">Deals of the Day</h1>
           <p className="text-gray-500 mt-2 text-sm uppercase tracking-widest">Limited time offers on premium collection</p>
+
+          {/* Timer */}
+          <div className="flex justify-center gap-3 md:gap-6 mt-8">
+            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+              <span className="text-3xl md:text-4xl font-bold">{timeLeft.days}</span>
+              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Days</span>
+            </div>
+            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+              <span className="text-3xl md:text-4xl font-bold">{timeLeft.hours}</span>
+              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Hours</span>
+            </div>
+            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+              <span className="text-3xl md:text-4xl font-bold">{timeLeft.minutes}</span>
+              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Mins</span>
+            </div>
+            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+              <span className="text-3xl md:text-4xl font-bold">{timeLeft.seconds}</span>
+              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Secs</span>
+            </div>
+          </div>
         </div>
 
-        {dealProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="animate-spin text-[#EE6348]" size={40} />
+          </div>
+        ) : dealProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {dealProducts.map(product => (
               <ProductCard
                 key={product.id}
@@ -1642,7 +2295,7 @@ const App: React.FC = () => {
         ) : (
           <div className="text-center py-16">
             <p className="text-xl text-gray-500">No deals available at the moment. Check back later!</p>
-            <button onClick={() => handleNavigate('shop')} className="mt-4 text-[#f10044] font-bold underline">Browse All Products</button>
+            <button onClick={() => handleNavigate('shop')} className="mt-4 text-[#EE6348] font-bold underline">Browse All Products</button>
           </div>
         )}
       </div>
@@ -1663,21 +2316,21 @@ const App: React.FC = () => {
 
             <div className="space-y-4 mb-8">
               <div className="flex items-start">
-                <Check className="text-[#f10044] mt-1 mr-3" size={18} />
+                <Check className="text-[#EE6348] mt-1 mr-3" size={18} />
                 <div>
                   <h4 className="font-bold text-gray-800">Premium Collection</h4>
                   <p className="text-sm text-gray-500">Access to designer wear at a fraction of the cost.</p>
                 </div>
               </div>
               <div className="flex items-start">
-                <Check className="text-[#f10044] mt-1 mr-3" size={18} />
+                <Check className="text-[#EE6348] mt-1 mr-3" size={18} />
                 <div>
                   <h4 className="font-bold text-gray-800">Hygiene First</h4>
                   <p className="text-sm text-gray-500">Professionally dry-cleaned and sanitized before every rental.</p>
                 </div>
               </div>
               <div className="flex items-start">
-                <Check className="text-[#f10044] mt-1 mr-3" size={18} />
+                <Check className="text-[#EE6348] mt-1 mr-3" size={18} />
                 <div>
                   <h4 className="font-bold text-gray-800">Easy Returns</h4>
                   <p className="text-sm text-gray-500">Simple pickup and drop-off process.</p>
@@ -1685,7 +2338,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <button className="bg-[#f10044] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm">
+            <button className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm">
               Contact Us to Rent
             </button>
           </div>
@@ -1707,10 +2360,10 @@ const App: React.FC = () => {
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               />
               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                <span className="bg-white text-[#f10044] font-bold px-4 py-2 uppercase text-sm tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">View</span>
+                <span className="bg-white text-[#EE6348] font-bold px-4 py-2 uppercase text-sm tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">View</span>
               </div>
             </div>
-            <h3 className="text-center font-bold text-gray-800 uppercase tracking-wide group-hover:text-[#f10044] transition">{cat.name}</h3>
+            <h3 className="text-center font-bold text-gray-800 uppercase tracking-wide group-hover:text-[#EE6348] transition">{cat.name}</h3>
           </div>
         ))}
       </div>
@@ -1727,7 +2380,7 @@ const App: React.FC = () => {
         cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)}
         wishlistCount={wishlist.length}
         menuItems={menuItems}
-        siteLogo={siteLogo || undefined}
+        siteLogo={siteLogo || DEFAULT_LOGO}
         siteName={siteInfo.name}
         isLoggedIn={isLoggedIn}
       />
@@ -1747,6 +2400,7 @@ const App: React.FC = () => {
         {view === 'page' && <PageView />}
         {view === 'track-order' && <TrackOrderView />}
         {view === 'cookie-policy' && <CookiePolicy onBack={() => handleNavigate('home')} />}
+        {view === 'thank-you' && <ThankYouView />}
       </main>
 
       <Footer onNavigate={handleNavigate} />

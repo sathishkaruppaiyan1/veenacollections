@@ -8,6 +8,24 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/wp-json': {
+            target: 'https://admin.theveenacollections.com',
+            changeOrigin: true,
+            secure: true,
+          },
+          '/newsletter-subscribe': {
+            target: 'https://admin.theveenacollections.com',
+            changeOrigin: true,
+            secure: true,
+            rewrite: (path) => '/?na=ajaxsub',
+          },
+          '/wp-comments-post.php': {
+            target: 'https://admin.theveenacollections.com',
+            changeOrigin: true,
+            secure: true,
+          },
+        },
       },
       plugins: [react()],
       define: {

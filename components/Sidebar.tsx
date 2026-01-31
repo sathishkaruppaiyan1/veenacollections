@@ -30,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="w-full lg:w-1/4 space-y-8">
       {/* Categories Widget */}
       <div className="border border-gray-200 bg-white">
-        <div className="bg-[#e31e24] text-white font-bold uppercase py-3 px-4 flex justify-between items-center">
+        <div className="bg-[#EE6348] text-white font-bold uppercase py-3 px-4 flex justify-between items-center">
           <span>Categories</span>
           <span className="text-xs">▼</span>
         </div>
@@ -38,10 +38,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {categories.map((item) => (
             <li
               key={item.id}
-              className="group flex items-center px-4 py-3 text-sm text-gray-600 hover:text-[#e31e24] cursor-pointer transition"
+              className="group flex items-center px-4 py-3 text-sm text-gray-600 hover:text-[#EE6348] cursor-pointer transition"
               onClick={() => onCategoryClick(item.name)}
             >
-              <ChevronRight size={14} className="mr-2 text-gray-300 group-hover:text-[#e31e24]" />
+              <ChevronRight size={14} className="mr-2 text-gray-300 group-hover:text-[#EE6348]" />
               {item.name}
             </li>
           ))}
@@ -49,10 +49,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {categories.length === 0 && ['Men', 'Women', 'Accessories'].map((item, idx) => (
             <li
               key={`static-${idx}`}
-              className="group flex items-center px-4 py-3 text-sm text-gray-600 hover:text-[#e31e24] cursor-pointer transition"
+              className="group flex items-center px-4 py-3 text-sm text-gray-600 hover:text-[#EE6348] cursor-pointer transition"
               onClick={() => onCategoryClick(item)}
             >
-              <ChevronRight size={14} className="mr-2 text-gray-300 group-hover:text-[#e31e24]" />
+              <ChevronRight size={14} className="mr-2 text-gray-300 group-hover:text-[#EE6348]" />
               {item}
             </li>
           ))}
@@ -61,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Price Filter */}
       <div className="border border-gray-200 bg-white">
-        <div className="bg-[#e31e24] text-white font-bold uppercase py-3 px-4">
+        <div className="bg-[#EE6348] text-white font-bold uppercase py-3 px-4">
           <span>Filter by Price</span>
         </div>
         <div className="p-4">
@@ -75,20 +75,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             max="1000"
             value={priceRange[1]}
             onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
-            className="w-full accent-[#e31e24]"
+            className="w-full accent-[#EE6348]"
           />
           <div className="flex gap-2 mt-2">
             <button
               onClick={() => setPriceRange([0, 50])}
-              className="text-xs border px-2 py-1 hover:border-[#e31e24] hover:text-[#e31e24]"
+              className="text-xs border px-2 py-1 hover:border-[#EE6348] hover:text-[#EE6348]"
             >Under $50</button>
             <button
               onClick={() => setPriceRange([50, 200])}
-              className="text-xs border px-2 py-1 hover:border-[#e31e24] hover:text-[#e31e24]"
+              className="text-xs border px-2 py-1 hover:border-[#EE6348] hover:text-[#EE6348]"
             >$50 - $200</button>
             <button
               onClick={() => setPriceRange([200, 1000])}
-              className="text-xs border px-2 py-1 hover:border-[#e31e24] hover:text-[#e31e24]"
+              className="text-xs border px-2 py-1 hover:border-[#EE6348] hover:text-[#EE6348]"
             >$200+</button>
           </div>
         </div>
@@ -96,16 +96,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Available Stock */}
       <div className="border border-gray-200 bg-white">
-        <div className="bg-[#e31e24] text-white font-bold uppercase py-3 px-4">
+        <div className="bg-[#EE6348] text-white font-bold uppercase py-3 px-4">
           <span>Availability</span>
         </div>
         <div className="p-4">
-          <label className="flex items-center space-x-2 cursor-pointer text-sm text-gray-600 hover:text-[#e31e24]">
+          <label className="flex items-center space-x-2 cursor-pointer text-sm text-gray-600 hover:text-[#EE6348]">
             <input
               type="checkbox"
               checked={showOutOfStock}
               onChange={() => setShowOutOfStock(!showOutOfStock)}
-              className="accent-[#e31e24]"
+              className="accent-[#EE6348]"
             />
             <span>Show Out of Stock Items</span>
           </label>
@@ -115,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Attribute Filters */}
       {attributes.map(attr => (
         <div key={attr.id} className="border border-gray-200 bg-white">
-          <div className="bg-[#e31e24] text-white font-bold uppercase py-3 px-4 flex justify-between items-center">
+          <div className="bg-[#EE6348] text-white font-bold uppercase py-3 px-4 flex justify-between items-center">
             <span>{attr.name}</span>
             <span className="text-xs">▼</span>
           </div>
@@ -130,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div
                       key={term.id}
                       onClick={() => toggleAttribute(attr.name, term.slug)}
-                      className={`w-8 h-8 rounded-full border-2 cursor-pointer flex items-center justify-center relative ${isSelected ? 'border-[#e31e24]' : 'border-gray-200'}`}
+                      className={`w-8 h-8 rounded-full border-2 cursor-pointer flex items-center justify-center relative ${isSelected ? 'border-[#EE6348]' : 'border-gray-200'}`}
                       style={{ backgroundColor: term.name.toLowerCase() }}
                       title={term.name}
                     >
@@ -144,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     key={term.id}
                     onClick={() => toggleAttribute(attr.name, term.slug)}
-                    className={`text-xs px-3 py-1 border transition ${isSelected ? 'bg-[#e31e24] text-white border-[#e31e24]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#e31e24]'}`}
+                    className={`text-xs px-3 py-1 border transition ${isSelected ? 'bg-[#EE6348] text-white border-[#EE6348]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#EE6348]'}`}
                   >
                     {term.name}
                   </button>
@@ -157,13 +157,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Popular Tags Widget */}
       <div className="border border-gray-200 bg-white">
-        <div className="bg-[#e31e24] text-white font-bold uppercase py-3 px-4 flex justify-between items-center">
+        <div className="bg-[#EE6348] text-white font-bold uppercase py-3 px-4 flex justify-between items-center">
           <span>Popular Tags</span>
           <span className="text-xs">▼</span>
         </div>
         <div className="p-4 flex flex-wrap gap-2">
           {['apparel', 'awesome', 'beautiful', 'black', 'cool', 'digital', 'golden', 'luxurious', 'nice', 'vintage'].map((tag, idx) => (
-            <span key={idx} className="text-xs text-gray-500 hover:text-[#e31e24] cursor-pointer transition border border-gray-200 px-2 py-1">
+            <span key={idx} className="text-xs text-gray-500 hover:text-[#EE6348] cursor-pointer transition border border-gray-200 px-2 py-1">
               {tag}
             </span>
           ))}

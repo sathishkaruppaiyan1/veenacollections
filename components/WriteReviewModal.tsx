@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Paperclip, Loader2 } from 'lucide-react';
+import { X, Paperclip, Loader2, Star } from 'lucide-react';
 
 export interface WriteReviewFormData {
   text: string;
   file?: File;
   authorName?: string;
   authorEmail: string;
+  rating?: number;
 }
 
 interface WriteReviewModalProps {
@@ -19,6 +20,8 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onCl
   const [file, setFile] = useState<File | null>(null);
   const [authorName, setAuthorName] = useState('');
   const [authorEmail, setAuthorEmail] = useState('');
+  const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -28,6 +31,8 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onCl
       setFile(null);
       setAuthorName('');
       setAuthorEmail('');
+      setRating(5);
+      setHoverRating(0);
       setFormError('');
     }
   }, [isOpen]);
@@ -54,6 +59,7 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onCl
         file: file || undefined,
         authorName: authorName.trim() || undefined,
         authorEmail: email,
+        rating,
       });
       onClose();
     } catch (err) {
@@ -85,13 +91,37 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onCl
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Star Rating */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Your Rating <span className="text-red-500">*</span></label>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRating(star)}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  className="p-1 transition-transform hover:scale-110"
+                >
+                  <Star
+                    size={28}
+                    fill={(hoverRating || rating) >= star ? "#EE6348" : "none"}
+                    stroke={(hoverRating || rating) >= star ? "#EE6348" : "#d1d5db"}
+                    className="transition-colors"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">Your name (optional)</label>
             <input
               type="text"
               value={authorName}
               onChange={(e) => setAuthorName(e.target.value)}
-              className="w-full border border-gray-300 p-2.5 text-sm focus:outline-none focus:border-[#e31e24]"
+              className="w-full border border-gray-300 p-2.5 text-sm focus:outline-none focus:border-[#EE6348]"
               placeholder="e.g. Jane Doe"
             />
           </div>
@@ -102,7 +132,7 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onCl
               value={authorEmail}
               onChange={(e) => setAuthorEmail(e.target.value)}
               required
-              className="w-full border border-gray-300 p-2.5 text-sm focus:outline-none focus:border-[#e31e24]"
+              className="w-full border border-gray-300 p-2.5 text-sm focus:outline-none focus:border-[#EE6348]"
               placeholder="your@email.com"
             />
           </div>
@@ -113,7 +143,7 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onCl
               onChange={(e) => setText(e.target.value)}
               required
               rows={4}
-              className="w-full border border-gray-300 p-2.5 text-sm focus:outline-none focus:border-[#e31e24] resize-y"
+              className="w-full border border-gray-300 p-2.5 text-sm focus:outline-none focus:border-[#EE6348] resize-y"
               placeholder="Share your experience..."
             />
           </div>
@@ -148,7 +178,7 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onCl
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 bg-[#e31e24] text-white font-bold uppercase py-2.5 text-sm hover:bg-[#c41a1f] transition disabled:opacity-60 flex items-center justify-center gap-2"
+              className="flex-1 bg-[#EE6348] text-white font-bold uppercase py-2.5 text-sm hover:bg-[#EE6348] transition disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {submitting ? <><Loader2 size={16} className="animate-spin" /> Submitting…</> : 'Submit'}
             </button>

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:admin.theveenacollections.com)",
+      "Bash(npm run dev:*)",
+      "Bash(git -C \"C:/Users/sathi/veenacollections\" status --porcelain)",
+      "Bash(git -C \"C:/Users/sathi/veenacollections\" clean -f nul)",
+      "Bash(cmd.exe /c \"del /f /q \\\\?\\\\C:\\\\Users\\\\sathi\\\\veenacollections\\\\nul\")",
+      "Bash(powershell -Command \"Remove-Item -LiteralPath ''\\\\?\\\\C:\\\\Users\\\\sathi\\\\veenacollections\\\\nul'' -Force -ErrorAction SilentlyContinue; if \\(Test-Path ''C:\\\\Users\\\\sathi\\\\veenacollections\\\\nul''\\) { Write-Host ''File still exists'' } else { Write-Host ''File deleted'' }\")",
+      "Bash(git -C \"C:/Users/sathi/veenacollections\" rm --cached nul)",
+      "Bash(git -C \"C:/Users/sathi/veenacollections\" update-index --remove nul)"
+    ]
+  }
+}

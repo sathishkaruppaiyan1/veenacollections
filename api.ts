@@ -1,5 +1,5 @@
 import { MOCK_PRODUCTS, CATEGORIES, NAV_ITEMS } from './constants';
-import { Product, Category, NavItem, Variation, Order } from './types';
+import { Product, Category, NavItem, Variation, Order, DealOfTheDayData } from './types';
 
 // ==========================================
 // ⚙️ CONFIGURATION
@@ -7,15 +7,18 @@ import { Product, Category, NavItem, Variation, Order } from './types';
 // ==========================================
 const WP_CONFIG = {
   // Your WordPress Site URL (no trailing slash)
-  SITE_URL: 'https://khaki-sparrow-300023.hostingersite.com',
+  SITE_URL: 'https://admin.theveenacollections.com',
 
   // WooCommerce REST API Keys (WooCommerce > Settings > Advanced > REST API)
   // WARNING: In a production app, never expose secrets in frontend code. Use a proxy server.
-  CONSUMER_KEY: 'ck_ed8e1befbb8cf9af9aa37bb25bc53460f9dad126',
-  CONSUMER_SECRET: 'cs_6161ab63060be64538aafbd678ae2b87be83c796',
+  CONSUMER_KEY: 'ck_9e2a74de176bb39930b1484a5c061af4b962d7cc',
+  CONSUMER_SECRET: 'cs_ace993e01a48ed2e715318479d0b2dd4d040bd67',
 };
 
-const API_BASE = `${WP_CONFIG.SITE_URL}/wp-json`;
+// Use proxy in development (Vite proxies /wp-json to WooCommerce)
+// In production, you would need a backend proxy or CORS enabled on WordPress
+const isDev = import.meta.env.DEV;
+const API_BASE = isDev ? '/wp-json' : `${WP_CONFIG.SITE_URL}/wp-json`;
 
 // Helper to handle API responses
 const handleResponse = async (response: Response) => {
@@ -93,6 +96,95 @@ export const api = {
     } catch (error) {
       console.error("Search failed:", error);
       return [];
+    }
+  },
+
+  // -----------------------------------------------------------
+  // 1b. Fetch Deal of the Day Products and Timer
+  //
+  // HOW TO SET UP IN WORDPRESS ADMIN:
+  //
+  // 1. PRODUCTS: Go to Products > Tags > Create a tag called "deal-of-the-day"
+  //    Then edit any product and add this tag to include it in Deal of the Day
+  //
+  // 2. TIMER: Go to Pages > Add New > Create a page with slug "deal-timer"
+  //    In the page content, enter the end date/time in this format:
+  //    2025-02-15T23:59:59
+  //    (Year-Month-DayTHour:Minute:Second)
+  // -----------------------------------------------------------
+  getDealProducts: async (): Promise<DealOfTheDayData> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        // Mock data fallback
+        return {
+          products: MOCK_PRODUCTS.slice(0, 3),
+          saleEndDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
+        };
+      }
+
+      // First, get the tag ID for "deal-of-the-day"
+      const tagResponse = await fetch(`${API_BASE}/wc/v3/products/tags?${getAuthParams()}&slug=deal-of-the-day`);
+      const tagData = await tagResponse.json();
+
+      if (!tagData || tagData.length === 0) {
+        console.warn("Tag 'deal-of-the-day' not found. Create it in WooCommerce > Products > Tags");
+        return { products: [], saleEndDate: null };
+      }
+
+      const tagId = tagData[0].id;
+
+      // Fetch products with the tag ID
+      const response = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&tag=${tagId}&per_page=20`);
+      const data = await handleResponse(response);
+
+      const products = data.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        price: parseFloat(item.price || 0),
+        oldPrice: item.regular_price ? parseFloat(item.regular_price) : undefined,
+        rating: Math.round(parseFloat(item.average_rating)) || 0,
+        image: item.images && item.images.length > 0 ? item.images[0].src : 'https://placehold.co/600x600?text=No+Image',
+        category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+        sku: item.sku,
+        type: item.type,
+        attributes: item.attributes || [],
+        date_created: item.date_created,
+        sale_price: item.sale_price,
+        date_on_sale_to: item.date_on_sale_to
+      }));
+
+      // Fetch timer end date from WordPress page "deal-timer"
+      let saleEndDate: string | null = null;
+      try {
+        const timerResponse = await fetch(`${API_BASE}/wp/v2/pages?slug=deal-timer`);
+        const timerData = await timerResponse.json();
+        if (timerData && timerData.length > 0) {
+          // Extract date from page content (strip HTML tags)
+          const content = timerData[0].content?.rendered || '';
+          const textContent = content.replace(/<[^>]*>/g, '').trim();
+          // Try to parse as ISO date
+          const parsedDate = new Date(textContent);
+          if (!isNaN(parsedDate.getTime())) {
+            saleEndDate = parsedDate.toISOString();
+          }
+        }
+      } catch (e) {
+        console.warn("Could not fetch deal timer page:", e);
+      }
+
+      // Fallback: if no timer page, use 2 days from now
+      if (!saleEndDate) {
+        saleEndDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+      }
+
+      return { products, saleEndDate };
+
+    } catch (error) {
+      console.error("Failed to fetch deal products:", error);
+      return {
+        products: MOCK_PRODUCTS.slice(0, 3),
+        saleEndDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
+      };
     }
   },
 
@@ -240,8 +332,11 @@ export const api = {
   // 6. Fetch Site Logo
   // -----------------------------------------------------------
   getSiteLogo: async (): Promise<string | null> => {
+    // Known logo URL - always return this for reliability
+    const KNOWN_LOGO = 'https://admin.theveenacollections.com/wp-content/uploads/2025/11/Blue-White-Modern-Minimalist-Name-Logo-2.png';
+    
     try {
-      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return null;
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return KNOWN_LOGO;
 
       const response = await fetch(`${API_BASE}/wp/v2/settings?${getAuthParams()}`);
 
@@ -253,14 +348,14 @@ export const api = {
           const mediaResponse = await fetch(`${API_BASE}/wp/v2/media/${logoId}`);
           if (mediaResponse.ok) {
             const media = await mediaResponse.json();
-            return media.source_url;
+            return media.source_url || KNOWN_LOGO;
           }
         }
       }
-      return null;
+      return KNOWN_LOGO;
     } catch (error) {
-      console.warn("Could not fetch site logo (likely requires permissions):", error);
-      return null;
+      console.warn("Could not fetch site logo, using default:", error);
+      return KNOWN_LOGO;
     }
   },
 
@@ -313,7 +408,92 @@ export const api = {
   },
 
   // -----------------------------------------------------------
-  // 7b. Submit Review (saves as WordPress comment on a "reviews" page, optional file to Media)
+  // 7b. Get Approved Reviews (from WordPress comments on "reviews" page)
+  //
+  // HOW IT WORKS:
+  // 1. Reviews are submitted as comments on a WordPress page with slug "reviews"
+  // 2. Go to WordPress Admin > Comments to moderate (Approve/Pending/Spam)
+  // 3. Only APPROVED comments will appear in the review slider
+  // -----------------------------------------------------------
+  getReviews: async (): Promise<Array<{
+    id: number;
+    name: string;
+    text: string;
+    rating: number;
+    date: string;
+    image?: string;
+  }>> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        // Return demo reviews
+        return [
+          { id: 1, name: "Sarah Johnson", text: "Absolutely stunning saree! The craftsmanship is incredible.", rating: 5, date: new Date().toISOString() },
+          { id: 2, name: "Michael Chen", text: "Great quality for the price. Would definitely recommend!", rating: 4, date: new Date().toISOString() },
+        ];
+      }
+
+      // Find the reviews page
+      let postId: number | null = null;
+      for (const slug of ['reviews', 'testimonials']) {
+        const r = await fetch(`${API_BASE}/wp/v2/pages?slug=${slug}`);
+        if (!r.ok) continue;
+        const pages = await r.json();
+        if (pages && pages[0] && pages[0].id) {
+          postId = pages[0].id;
+          break;
+        }
+      }
+
+      if (!postId) {
+        console.warn("No reviews page found. Create a page with slug 'reviews' in WordPress.");
+        return [];
+      }
+
+      // Fetch approved comments for this page
+      const response = await fetch(`${API_BASE}/wp/v2/comments?post=${postId}&status=approve&per_page=20&orderby=date&order=desc`);
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const comments = await response.json();
+
+      return comments.map((comment: any) => {
+        // Extract rating from comment content if present (e.g., "Rating: 5" or stars)
+        // Default to 5 stars if no rating found
+        let rating = 5;
+        const ratingMatch = comment.content?.rendered?.match(/rating[:\s]*(\d)/i);
+        if (ratingMatch) {
+          rating = Math.min(5, Math.max(1, parseInt(ratingMatch[1])));
+        }
+
+        // Strip HTML tags from content
+        const textContent = (comment.content?.rendered || '')
+          .replace(/<[^>]*>/g, '')
+          .replace(/rating[:\s]*\d/i, '')
+          .trim();
+
+        // Check if there's an attachment link in the content
+        const imgMatch = comment.content?.rendered?.match(/<a[^>]*href="([^"]*\.(jpg|jpeg|png|gif|webp))"[^>]*>/i);
+        const image = imgMatch ? imgMatch[1] : undefined;
+
+        return {
+          id: comment.id,
+          name: comment.author_name || 'Anonymous',
+          text: textContent,
+          rating,
+          date: comment.date,
+          image
+        };
+      });
+    } catch (error) {
+      console.error("Failed to fetch reviews:", error);
+      return [];
+    }
+  },
+
+  // -----------------------------------------------------------
+  // 7c. Submit Review (saves as WordPress comment on a "reviews" page, optional file to Media)
   // Create a WordPress page with slug "reviews" or "testimonials" to collect these.
   // -----------------------------------------------------------
   submitReview: async (args: {
@@ -321,8 +501,9 @@ export const api = {
     file?: File;
     authorName?: string;
     authorEmail: string;
+    rating?: number;
   }): Promise<void> => {
-    const { text, file, authorName, authorEmail } = args;
+    const { text, file, authorName, authorEmail, rating = 5 } = args;
     if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
       throw new Error('WordPress is not configured. Set SITE_URL in api.ts.');
     }
@@ -356,7 +537,8 @@ export const api = {
       }
     }
 
-    const content = `<p>${escapeHtml(text)}</p>${attachmentHtml}`;
+    // Include rating in a hidden format that can be parsed when displaying
+    const content = `<p>Rating: ${rating}</p><p>${escapeHtml(text)}</p>${attachmentHtml}`;
 
     let postId: number | null = null;
     for (const slug of ['reviews', 'testimonials']) {
@@ -372,38 +554,88 @@ export const api = {
       throw new Error("Please create a WordPress page with slug 'reviews' or 'testimonials' to collect reviews.");
     }
 
-    const res = await fetch(`${API_BASE}/wp/v2/comments`, {
+    // Use native WordPress comment form submission (wp-comments-post.php)
+    // This bypasses REST API authentication requirements
+    const formData = new FormData();
+    formData.append('comment_post_ID', postId.toString());
+    formData.append('comment', content);
+    formData.append('author', authorName || 'Guest');
+    formData.append('email', authorEmail);
+    formData.append('url', ''); // Website field (optional)
+
+    const commentUrl = isDev
+      ? '/wp-comments-post.php'
+      : `${WP_CONFIG.SITE_URL}/wp-comments-post.php`;
+
+    const res = await fetch(commentUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        post: postId,
-        content,
-        author_name: authorName || 'Guest',
-        author_email: authorEmail || 'guest@veenacollections.local',
-      }),
+      body: formData,
+      redirect: 'manual' // Don't follow redirects
     });
-    await handleResponse(res);
+
+    // wp-comments-post.php redirects on success (302) or shows error page
+    // Status 0 or 302 means success (redirect happened)
+    if (res.status === 0 || res.status === 302 || res.status === 200 || res.type === 'opaqueredirect') {
+      return; // Success
+    }
+
+    // Check for error in response
+    const responseText = await res.text();
+    if (responseText.includes('Duplicate comment') || responseText.includes('duplicate')) {
+      throw new Error('You have already submitted this review.');
+    }
+    if (responseText.includes('too quickly') || responseText.includes('slow down')) {
+      throw new Error('Please wait a moment before submitting another review.');
+    }
+    if (res.status >= 400) {
+      throw new Error('Could not submit review. Please try again.');
+    }
   },
 
   // -----------------------------------------------------------
   // 7c. Newsletter Subscribe
-  // Suggests: MC4WP (Mailchimp for WordPress) or Newsletter by Stefano Lissa.
-  // This app POSTs to MC4WP's REST endpoint. If that 404s, we still resolve so the
-  // thank-you message shows; install a plugin to persist in WordPress.
+  //
+  // USING: "Newsletter" by Stefano Lissa (FREE)
+  // Plugin is already installed, subscribers go to Newsletter > Subscribers
   // -----------------------------------------------------------
   subscribeNewsletter: async (email: string): Promise<void> => {
     if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return;
 
-    const url = `${API_BASE}/mc4wp/v1/subscribe`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim() }),
-    });
-    // 404 = MC4WP not installed; still show thank-you. 200/201 = success.
-    if (res.ok || res.status === 404) return;
-    const err = await res.text();
-    throw new Error(err || `Subscribe failed (${res.status})`);
+    const trimmedEmail = email.trim();
+
+    // Newsletter plugin by Stefano Lissa - uses form submission
+    const formData = new FormData();
+    formData.append('ne', trimmedEmail);
+    formData.append('nlang', '');
+
+    try {
+      // Use proxy in dev, direct URL in production
+      const subscribeUrl = isDev ? '/newsletter-subscribe' : `${WP_CONFIG.SITE_URL}/?na=ajaxsub`;
+
+      const response = await fetch(subscribeUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.text();
+
+      // Newsletter plugin returns JSON with status
+      try {
+        const json = JSON.parse(result);
+        if (json.status === 0 && json.message) {
+          throw new Error(json.message);
+        }
+        // status 1 = success, 2 = confirmation email sent, etc.
+        return;
+      } catch (parseError) {
+        // If not JSON but response OK, consider success
+        if (response.ok) return;
+        throw new Error('Subscription failed. Please try again.');
+      }
+    } catch (e) {
+      console.warn("Newsletter subscription failed:", e);
+      throw e;
+    }
   },
 
   // -----------------------------------------------------------
@@ -467,6 +699,220 @@ export const api = {
     } catch (e) {
       console.warn('validateCoupon failed:', e);
       return { valid: false, message: 'Could not validate coupon. Please try again.' };
+    }
+  },
+
+  // -----------------------------------------------------------
+  // 7e. Create Order in WooCommerce
+  // -----------------------------------------------------------
+  createOrder: async (orderData: {
+    billing: {
+      first_name: string;
+      last_name: string;
+      company?: string;
+      address_1: string;
+      city: string;
+      phone: string;
+      email: string;
+    };
+    line_items: Array<{
+      product_id: number;
+      quantity: number;
+      variation_id?: number;
+    }>;
+    payment_method: string;
+    payment_method_title: string;
+    coupon_lines?: Array<{ code: string }>;
+  }): Promise<{ id: number; order_key: string; status: string }> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        return { id: Date.now(), order_key: 'demo-' + Date.now(), status: 'pending' };
+      }
+
+      const response = await fetch(`${API_BASE}/wc/v3/orders?${getAuthParams()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...orderData,
+          set_paid: orderData.payment_method === 'cod' ? false : false, // COD orders are not paid
+          status: 'processing'
+        }),
+      });
+
+      const data = await handleResponse(response);
+      return {
+        id: data.id,
+        order_key: data.order_key,
+        status: data.status
+      };
+    } catch (error) {
+      console.error("Failed to create order:", error);
+      throw error;
+    }
+  },
+
+  // -----------------------------------------------------------
+  // 7f. Fetch Payment Gateways
+  // -----------------------------------------------------------
+  getPaymentGateways: async (): Promise<Array<{ id: string; title: string; description: string; enabled: boolean }>> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        return [
+          { id: 'cod', title: 'Cash on Delivery', description: 'Pay with cash upon delivery.', enabled: true }
+        ];
+      }
+
+      const response = await fetch(`${API_BASE}/wc/v3/payment_gateways?${getAuthParams()}`);
+      const data = await handleResponse(response);
+
+      return data
+        .filter((gateway: any) => gateway.enabled)
+        .map((gateway: any) => ({
+          id: gateway.id,
+          title: gateway.title,
+          description: gateway.description || '',
+          enabled: gateway.enabled
+        }));
+    } catch (error) {
+      console.error("Failed to fetch payment gateways:", error);
+      return [
+        { id: 'cod', title: 'Cash on Delivery', description: 'Pay with cash upon delivery.', enabled: true }
+      ];
+    }
+  },
+
+  // -----------------------------------------------------------
+  // 7g. Get Shipment Tracking (AST Pro Plugin)
+  // Requires: Advanced Shipment Tracking Pro plugin
+  // -----------------------------------------------------------
+  getShipmentTracking: async (orderId: number): Promise<Array<{
+    tracking_number: string;
+    tracking_provider: string;
+    tracking_link: string;
+    date_shipped: string;
+    status?: string;
+  }>> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        return [];
+      }
+
+      const response = await fetch(`${API_BASE}/wc-ast/v3/orders/${orderId}/shipment-trackings?${getAuthParams()}`);
+
+      if (!response.ok) {
+        // AST Pro not installed or no tracking for this order
+        return [];
+      }
+
+      const data = await response.json();
+
+      return Array.isArray(data) ? data.map((item: any) => ({
+        tracking_number: item.tracking_number || '',
+        tracking_provider: item.tracking_provider || item.custom_tracking_provider || 'Unknown',
+        tracking_link: item.tracking_link || item.formatted_tracking_link || '',
+        date_shipped: item.date_shipped || '',
+        status: item.status_text || item.status || ''
+      })) : [];
+    } catch (error) {
+      console.error("Failed to fetch shipment tracking:", error);
+      return [];
+    }
+  },
+
+  // -----------------------------------------------------------
+  // 7h. Get Order by ID (for tracking page)
+  // -----------------------------------------------------------
+  getOrderById: async (orderId: number, billingEmail?: string): Promise<Order | null> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        return null;
+      }
+
+      const response = await fetch(`${API_BASE}/wc/v3/orders/${orderId}?${getAuthParams()}`);
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const order = await response.json();
+
+      // Verify email if provided (for security)
+      if (billingEmail && order.billing?.email?.toLowerCase() !== billingEmail.toLowerCase()) {
+        return null;
+      }
+
+      return {
+        id: order.id,
+        status: order.status,
+        date_created: order.date_created,
+        total: order.total,
+        currency: order.currency,
+        line_items: order.line_items.map((li: any) => ({
+          name: li.name,
+          quantity: li.quantity,
+          total: li.total
+        }))
+      };
+    } catch (error) {
+      console.error("Failed to fetch order:", error);
+      return null;
+    }
+  },
+
+  // -----------------------------------------------------------
+  // 7i. Get Customer by Email (for addresses)
+  // -----------------------------------------------------------
+  getCustomerByEmail: async (email: string): Promise<{
+    billing: {
+      first_name: string;
+      last_name: string;
+      company: string;
+      address_1: string;
+      address_2: string;
+      city: string;
+      state: string;
+      postcode: string;
+      country: string;
+      email: string;
+      phone: string;
+    };
+    shipping: {
+      first_name: string;
+      last_name: string;
+      company: string;
+      address_1: string;
+      address_2: string;
+      city: string;
+      state: string;
+      postcode: string;
+      country: string;
+    };
+  } | null> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        return null;
+      }
+
+      const response = await fetch(`${API_BASE}/wc/v3/customers?${getAuthParams()}&email=${encodeURIComponent(email)}`);
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const customer = data[0];
+        return {
+          billing: customer.billing || {},
+          shipping: customer.shipping || {}
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Failed to fetch customer:", error);
+      return null;
     }
   },
 
