@@ -3,7 +3,7 @@ import { X, Paperclip, Loader2, Star } from 'lucide-react';
 
 export interface WriteReviewFormData {
   text: string;
-  file?: File;
+  image?: string;
   authorName?: string;
   authorEmail: string;
   rating?: number;
@@ -17,18 +17,18 @@ interface WriteReviewModalProps {
 
 export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onClose, onSubmit }) => {
   const [text, setText] = useState('');
-  const [file, setFile] = useState<File | null>(null);
   const [authorName, setAuthorName] = useState('');
   const [authorEmail, setAuthorEmail] = useState('');
   const [rating, setRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setText('');
-      setFile(null);
+      setImagePreview(null);
       setAuthorName('');
       setAuthorEmail('');
       setRating(5);
@@ -56,7 +56,7 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onCl
     try {
       await onSubmit({
         text: reviewText,
-        file: file || undefined,
+        image: imagePreview || undefined,
         authorName: authorName.trim() || undefined,
         authorEmail: email,
         rating,
@@ -148,19 +148,39 @@ export const WriteReviewModal: React.FC<WriteReviewModalProps> = ({ isOpen, onCl
             />
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Attach a file (optional)</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1">Attach a photo (optional)</label>
             <label className="flex items-center gap-2 border border-gray-300 border-dashed p-3 rounded cursor-pointer hover:bg-gray-50 transition">
               <Paperclip size={16} className="text-gray-500 flex-shrink-0" />
               <span className="text-sm text-gray-600 truncate">
-                {file ? file.name : 'Choose image or document'}
+                {imagePreview ? 'Image selected' : 'Choose image'}
               </span>
               <input
                 type="file"
                 className="hidden"
-                accept="image/*,.pdf,.doc,.docx"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => setImagePreview(reader.result as string);
+                    reader.readAsDataURL(file);
+                  }
+                  e.target.value = '';
+                }}
               />
             </label>
+            {imagePreview && (
+              <div className="relative inline-block mt-2">
+                <img src={imagePreview} alt="Preview" className="w-24 h-24 object-cover rounded border border-gray-200" />
+                <button
+                  type="button"
+                  onClick={() => setImagePreview(null)}
+                  className="absolute -top-2 -right-2 bg-white border border-gray-300 rounded-full p-0.5 text-gray-500 hover:text-red-500 transition"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
           </div>
 
           {formError && (

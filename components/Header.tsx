@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, Heart, User, Search, Lock, Menu, X, ChevronRight, Truck, Loader2 } from 'lucide-react';
+import { ShoppingCart, Heart, UserCircle2, Search, Menu, X, ChevronRight, Truck, Loader2 } from 'lucide-react';
 import { NavItem, Product } from '../types';
 import { api } from '../api';
 
@@ -93,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
             {isLoggedIn && (
               <button onClick={() => onNavigate('account', 'dashboard')} className="flex items-center hover:text-white transition">
-                <User size={14} className="mr-1" />
+                <UserCircle2 size={14} className="mr-1" />
                 <span className="hidden sm:inline">My Account</span>
               </button>
             )}
@@ -116,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => onNavigate('register')}
                 className="flex items-center hover:text-white transition"
               >
-                <Lock size={14} className="mr-1" />
+                <UserCircle2 size={14} className="mr-1" />
                 <span className="hidden sm:inline">Log in</span>
               </button>
             )}
@@ -151,10 +151,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <img
                   src={siteLogo}
                   alt={siteName}
-                  className="h-14 lg:h-20 mr-3 object-contain"
+                  className="h-20 lg:h-20 mr-3 object-contain"
                 />
               ) : (
-                <div className="relative w-12 h-12 lg:w-16 lg:h-16 mr-3 border-2 border-gray-200 rounded-full flex items-center justify-center flex-shrink-0 bg-[#EE6348] text-white font-bold text-lg lg:text-xl font-heading">
+                <div className="relative w-16 h-16 lg:w-16 lg:h-16 mr-3 border-2 border-gray-200 rounded-full flex items-center justify-center flex-shrink-0 bg-[#EE6348] text-white font-bold text-xl lg:text-xl font-heading">
                   VC
                 </div>
               )}
@@ -296,21 +296,44 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="relative">
               <input
                 type="text"
+                value={searchQuery}
+                onChange={handleSearch}
                 placeholder="Search..."
-                className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm px-4 py-2 rounded focus:outline-none focus:border-black"
+                className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-sm px-4 py-2 rounded focus:outline-none focus:border-[#EE6348]"
               />
-              <Search size={14} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              {isSearching ? (
+                <Loader2 size={14} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#EE6348] animate-spin" />
+              ) : (
+                <Search size={14} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              )}
             </div>
-          </div>
-
-          <div className="mb-6 border-b border-gray-100 pb-4">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Pages</h3>
-            <ul className="space-y-2">
-              <li onClick={() => { onNavigate('home'); setIsMenuOpen(false); }} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer font-semibold text-gray-700">Home</li>
-              <li onClick={() => { onNavigate('cart'); setIsMenuOpen(false); }} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer font-semibold text-gray-700">Cart</li>
-              <li onClick={() => { onNavigate('page', 'contact'); setIsMenuOpen(false); }} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer font-semibold text-gray-700">Contact</li>
-              <li onClick={() => { onNavigate('page', 'about-us'); setIsMenuOpen(false); }} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer font-semibold text-gray-700">About</li>
-            </ul>
+            {showResults && searchResults.length > 0 && (
+              <div className="mt-2 bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {searchResults.map(product => (
+                  <div
+                    key={product.id}
+                    className="flex items-center p-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-none transition"
+                    onClick={() => {
+                      onProductClick(product.id);
+                      setShowResults(false);
+                      setSearchQuery('');
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <img src={product.image} alt={product.name} className="w-10 h-10 object-contain mr-3 bg-gray-50 rounded" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold truncate text-gray-800">{product.name}</h4>
+                      <p className="text-xs text-[#EE6348] font-bold">${product.price.toFixed(2)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {showResults && searchQuery.length > 2 && !isSearching && searchResults.length === 0 && (
+              <div className="mt-2 bg-white text-gray-500 text-sm p-3 text-center rounded-lg border border-gray-100">
+                No products found.
+              </div>
+            )}
           </div>
 
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Categories</h3>
@@ -338,7 +361,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="mt-8 pt-6 border-t border-gray-100">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">My Account</h3>
             <ul className="space-y-3 text-sm text-gray-600">
-              <li onClick={() => { onNavigate('account', 'dashboard'); setIsMenuOpen(false); }} className="cursor-pointer hover:text-[#EE6348] flex items-center"><User size={14} className="mr-2" /> Dashboard</li>
+              <li onClick={() => { onNavigate('account', 'dashboard'); setIsMenuOpen(false); }} className="cursor-pointer hover:text-[#EE6348] flex items-center"><UserCircle2 size={14} className="mr-2" /> Dashboard</li>
               <li onClick={() => { onNavigate('account', 'orders'); setIsMenuOpen(false); }} className="cursor-pointer hover:text-[#EE6348] flex items-center"><ShoppingCart size={14} className="mr-2" /> Orders</li>
               <li onClick={() => { onNavigate('wishlist'); setIsMenuOpen(false); }} className="cursor-pointer hover:text-[#EE6348] flex items-center"><Heart size={14} className="mr-2" /> Wishlist</li>
               <li onClick={() => { onNavigate('track-order'); setIsMenuOpen(false); }} className="cursor-pointer hover:text-[#EE6348] flex items-center"><Truck size={14} className="mr-2" /> Track Order</li>

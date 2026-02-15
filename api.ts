@@ -418,6 +418,7 @@ export const api = {
   getReviews: async (): Promise<Array<{
     id: number;
     name: string;
+    email?: string;
     text: string;
     rating: number;
     date: string;
@@ -425,64 +426,57 @@ export const api = {
   }>> => {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
-        // Return demo reviews
         return [
           { id: 1, name: "Sarah Johnson", text: "Absolutely stunning saree! The craftsmanship is incredible.", rating: 5, date: new Date().toISOString() },
           { id: 2, name: "Michael Chen", text: "Great quality for the price. Would definitely recommend!", rating: 4, date: new Date().toISOString() },
         ];
       }
 
-      // Find the reviews page
-      let postId: number | null = null;
-      for (const slug of ['reviews', 'testimonials']) {
-        const r = await fetch(`${API_BASE}/wp/v2/pages?slug=${slug}`);
-        if (!r.ok) continue;
-        const pages = await r.json();
-        if (pages && pages[0] && pages[0].id) {
-          postId = pages[0].id;
-          break;
-        }
+      // Fetch approved product reviews via WooCommerce REST API
+      const response = await fetch(`${API_BASE}/wc/v3/products/reviews?${getAuthParams()}&per_page=20&status=approved&orderby=date_gmt&order=desc`);
+      if (!response.ok) return [];
+
+      const allReviews = await response.json();
+
+      // Double-check: only show approved reviews (admin keys may bypass server-side filter)
+      const reviews = allReviews.filter((r: any) => r.status === 'approved');
+
+      // Collect unique product IDs to fetch their images
+      const productIds = [...new Set(reviews.map((r: any) => r.product_id).filter(Boolean))] as number[];
+      const productImages: Record<number, string> = {};
+
+      if (productIds.length > 0) {
+        try {
+          const ids = productIds.slice(0, 20).join(',');
+          const prodRes = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&include=${ids}&per_page=20`);
+          if (prodRes.ok) {
+            const products = await prodRes.json();
+            for (const p of products) {
+              const img = p.images?.[0]?.src;
+              if (img) productImages[p.id] = img;
+            }
+          }
+        } catch (_) { /* proceed without product images */ }
       }
 
-      if (!postId) {
-        console.warn("No reviews page found. Create a page with slug 'reviews' in WordPress.");
-        return [];
-      }
-
-      // Fetch approved comments for this page
-      const response = await fetch(`${API_BASE}/wp/v2/comments?post=${postId}&status=approve&per_page=20&orderby=date&order=desc`);
-
-      if (!response.ok) {
-        return [];
-      }
-
-      const comments = await response.json();
-
-      return comments.map((comment: any) => {
-        // Extract rating from comment content if present (e.g., "Rating: 5" or stars)
-        // Default to 5 stars if no rating found
-        let rating = 5;
-        const ratingMatch = comment.content?.rendered?.match(/rating[:\s]*(\d)/i);
-        if (ratingMatch) {
-          rating = Math.min(5, Math.max(1, parseInt(ratingMatch[1])));
-        }
-
-        // Strip HTML tags from content
-        const textContent = (comment.content?.rendered || '')
+      return reviews.map((review: any) => {
+        const textContent = (review.review || '')
           .replace(/<[^>]*>/g, '')
-          .replace(/rating[:\s]*\d/i, '')
           .trim();
 
-        // Check if there's an attachment link in the content
-        const imgMatch = comment.content?.rendered?.match(/<a[^>]*href="([^"]*\.(jpg|jpeg|png|gif|webp))"[^>]*>/i);
-        const image = imgMatch ? imgMatch[1] : undefined;
+        // Use product image, then reviewer avatar, then fallback
+        const image = productImages[review.product_id]
+          || review.reviewer_avatar_urls?.['96']
+          || review.reviewer_avatar_urls?.['48']
+          || undefined;
 
         return {
-          id: comment.id,
-          name: comment.author_name || 'Anonymous',
+          id: review.id,
+          name: review.reviewer || 'Anonymous',
+          email: review.reviewer_email || undefined,
           text: textContent,
-          rating,
-          date: comment.date,
+          rating: review.rating || 5,
+          date: review.date_created,
           image
         };
       });
@@ -493,102 +487,51 @@ export const api = {
   },
 
   // -----------------------------------------------------------
-  // 7c. Submit Review (saves as WordPress comment on a "reviews" page, optional file to Media)
-  // Create a WordPress page with slug "reviews" or "testimonials" to collect these.
+  // 7c. Submit Review (saves as WooCommerce product review on a random product)
+  // Uses WooCommerce REST API which authenticates with consumer key/secret
   // -----------------------------------------------------------
   submitReview: async (args: {
     text: string;
-    file?: File;
     authorName?: string;
     authorEmail: string;
     rating?: number;
   }): Promise<void> => {
-    const { text, file, authorName, authorEmail, rating = 5 } = args;
+    const { text, authorName, authorEmail, rating = 5 } = args;
     if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
       throw new Error('WordPress is not configured. Set SITE_URL in api.ts.');
     }
 
-    const escapeHtml = (s: string) =>
-      String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-
-    let attachmentHtml = '';
-    if (file) {
-      try {
-        const mediaUrl = `${API_BASE}/wp/v2/media?${getAuthParams()}`;
-        const res = await fetch(mediaUrl, {
-          method: 'POST',
-          body: file,
-          headers: {
-            'Content-Disposition': `attachment; filename="${encodeURIComponent(file.name)}"`,
-          },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const url = data.source_url || data.guid?.rendered || '';
-          const name = file.name || 'attachment';
-          if (url) attachmentHtml = ` <p>Attachment: <a href="${escapeHtml(url)}">${escapeHtml(name)}</a></p>`;
-        }
-      } catch (e) {
-        console.warn('Review attachment upload failed, submitting text only:', e);
-      }
+    // Pick a random product to attach the review to
+    const productsRes = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&per_page=10&status=publish`);
+    if (!productsRes.ok) {
+      throw new Error('Could not fetch products. Please try again.');
     }
-
-    // Include rating in a hidden format that can be parsed when displaying
-    const content = `<p>Rating: ${rating}</p><p>${escapeHtml(text)}</p>${attachmentHtml}`;
-
-    let postId: number | null = null;
-    for (const slug of ['reviews', 'testimonials']) {
-      const r = await fetch(`${API_BASE}/wp/v2/pages?slug=${slug}`);
-      if (!r.ok) continue;
-      const pages = await r.json();
-      if (pages && pages[0] && pages[0].id) {
-        postId = pages[0].id;
-        break;
-      }
+    const products = await productsRes.json();
+    if (!products || products.length === 0) {
+      throw new Error('No products found to attach review to.');
     }
-    if (!postId) {
-      throw new Error("Please create a WordPress page with slug 'reviews' or 'testimonials' to collect reviews.");
-    }
+    const randomProduct = products[Math.floor(Math.random() * products.length)];
 
-    // Use native WordPress comment form submission (wp-comments-post.php)
-    // This bypasses REST API authentication requirements
-    const formData = new FormData();
-    formData.append('comment_post_ID', postId.toString());
-    formData.append('comment', content);
-    formData.append('author', authorName || 'Guest');
-    formData.append('email', authorEmail);
-    formData.append('url', ''); // Website field (optional)
-
-    const commentUrl = isDev
-      ? '/wp-comments-post.php'
-      : `${WP_CONFIG.SITE_URL}/wp-comments-post.php`;
-
-    const res = await fetch(commentUrl, {
+    // Submit review via WooCommerce REST API with hold status so admin can moderate
+    const res = await fetch(`${API_BASE}/wc/v3/products/reviews?${getAuthParams()}`, {
       method: 'POST',
-      body: formData,
-      redirect: 'manual' // Don't follow redirects
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        product_id: randomProduct.id,
+        review: text,
+        reviewer: authorName || 'Guest',
+        reviewer_email: authorEmail,
+        rating: rating,
+        status: 'hold',
+      }),
     });
 
-    // wp-comments-post.php redirects on success (302) or shows error page
-    // Status 0 or 302 means success (redirect happened)
-    if (res.status === 0 || res.status === 302 || res.status === 200 || res.type === 'opaqueredirect') {
-      return; // Success
-    }
-
-    // Check for error in response
-    const responseText = await res.text();
-    if (responseText.includes('Duplicate comment') || responseText.includes('duplicate')) {
-      throw new Error('You have already submitted this review.');
-    }
-    if (responseText.includes('too quickly') || responseText.includes('slow down')) {
-      throw new Error('Please wait a moment before submitting another review.');
-    }
-    if (res.status >= 400) {
-      throw new Error('Could not submit review. Please try again.');
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      if (errData.code === 'woocommerce_rest_comment_duplicate') {
+        throw new Error('You have already submitted this review.');
+      }
+      throw new Error(errData.message || 'Could not submit review. Please try again.');
     }
   },
 

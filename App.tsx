@@ -12,7 +12,7 @@ import { CookiePolicy } from './components/CookiePolicy';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { api } from './api';
 import { Product, ViewState, CartItem, Category, NavItem, Variation, Order } from './types';
-import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, User, Package, MapPin, LogOut, CreditCard, Quote, Tag, Truck, Phone, Mail } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, UserCircle2, Package, MapPin, LogOut, CreditCard, Quote, Tag, Truck, Phone, Mail } from 'lucide-react';
 
 const DEFAULT_LOGO = "https://admin.theveenacollections.com/wp-content/uploads/2025/11/Blue-White-Modern-Minimalist-Name-Logo-2.png";
 
@@ -142,7 +142,7 @@ const DealOfTheDay = ({ onNavigate, onProductClick, onAddToCart, onToggleWishlis
 
 const CustomerReviews = () => {
   // Default/fallback reviews shown while loading or if no reviews exist
-  const defaultReviews = [
+  const defaultReviews: Array<{ id: number; name: string; rating: number; text: string; image: string; uploadedImage?: string }> = [
     {
       id: 1,
       name: "Sarah Johnson",
@@ -170,25 +170,28 @@ const CustomerReviews = () => {
   const [currentReview, setCurrentReview] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Fetch approved reviews from WordPress
+  // Fetch approved reviews from WooCommerce
   useEffect(() => {
     const fetchReviews = async () => {
       try {
         const fetchedReviews = await api.getReviews();
         if (fetchedReviews.length > 0) {
-          // Map fetched reviews to display format
+          // Load any locally saved uploaded images
+          let savedImages: Record<string, string> = {};
+          try { savedImages = JSON.parse(localStorage.getItem('reviewImages') || '{}'); } catch (_) {}
+
           const formattedReviews = fetchedReviews.map(r => ({
             id: r.id,
             name: r.name,
             rating: r.rating,
             text: r.text,
-            image: r.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=EE6348&color=fff&size=200`
+            image: r.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=EE6348&color=fff&size=200`,
+            uploadedImage: savedImages[r.email || ''] || undefined
           }));
           setReviews(formattedReviews);
         }
       } catch (error) {
         console.error("Failed to fetch reviews:", error);
-        // Keep default reviews on error
       } finally {
         setLoading(false);
       }
@@ -243,7 +246,16 @@ const CustomerReviews = () => {
                       <Star key={i} size={20} fill={i < (reviews[currentReview]?.rating || 5) ? "currentColor" : "none"} stroke="currentColor" className={i < (reviews[currentReview]?.rating || 5) ? "" : "text-gray-300"} />
                     ))}
                   </div>
-                  <p className="text-gray-600 text-lg italic mb-6 leading-relaxed">"{reviews[currentReview]?.text}"</p>
+                  <p className="text-gray-600 text-lg italic mb-4 leading-relaxed">"{reviews[currentReview]?.text}"</p>
+                  {reviews[currentReview]?.uploadedImage && (
+                    <div className="mb-4">
+                      <img
+                        src={reviews[currentReview].uploadedImage}
+                        alt="Review photo"
+                        className="max-w-[200px] max-h-[200px] object-cover rounded-lg border border-gray-200 shadow-sm"
+                      />
+                    </div>
+                  )}
                   <div>
                     <h4 className="font-bold text-gray-800 uppercase tracking-wide">{reviews[currentReview]?.name}</h4>
                     <span className="text-xs text-gray-500">Verified Buyer</span>
@@ -285,6 +297,7 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
@@ -967,7 +980,7 @@ const App: React.FC = () => {
                 onClick={() => setAccountTab('dashboard')}
                 className={`flex items-center px-4 py-3 text-sm font-bold text-left hover:bg-gray-50 border-b border-gray-100 transition ${accountTab === 'dashboard' ? 'text-[#EE6348] border-l-4 border-l-[#EE6348]' : 'text-gray-600'}`}
               >
-                <User size={16} className="mr-3" /> Dashboard
+                <UserCircle2 size={16} className="mr-3" /> Dashboard
               </button>
               <button
                 onClick={() => setAccountTab('orders')}
@@ -1528,7 +1541,7 @@ const App: React.FC = () => {
 
 
         {/* Customer Reviews */}
-        <CustomerReviews />
+        <CustomerReviews key={reviewRefreshKey} />
 
         <div className="container mx-auto px-4 text-center pt-6 pb-12">
           <button
@@ -1544,9 +1557,18 @@ const App: React.FC = () => {
           onClose={() => setShowReviewModal(false)}
           onSubmit={async (data) => {
             await api.submitReview(data);
+            // Save uploaded image to localStorage so it can be shown with the review
+            if (data.image) {
+              try {
+                const savedImages = JSON.parse(localStorage.getItem('reviewImages') || '{}');
+                savedImages[data.authorEmail] = data.image;
+                localStorage.setItem('reviewImages', JSON.stringify(savedImages));
+              } catch (_) {}
+            }
             setToast({ message: 'Thank you! Your review has been submitted.', visible: true });
             setTimeout(() => setToast((p) => ({ ...p, visible: false })), 4000);
             setShowReviewModal(false);
+            setReviewRefreshKey(prev => prev + 1);
           }}
         />
 
@@ -1650,15 +1672,6 @@ const App: React.FC = () => {
                   <option value="name-desc">Name: Z to A</option>
                   <option value="price-asc">Price: Low to High</option>
                   <option value="price-desc">Price: High to Low</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Display</span>
-                <select className="border border-gray-300 p-1.5 text-sm text-gray-600 focus:outline-none focus:border-[#EE6348]">
-                  <option>6</option>
-                  <option>9</option>
-                  <option>12</option>
-                  <option>24</option>
                 </select>
               </div>
             </>
@@ -1774,9 +1787,6 @@ const App: React.FC = () => {
               >
                 <Heart size={12} className="mr-1" fill={isInWishlist(activeProduct.id) ? "currentColor" : "none"} />
                 {isInWishlist(activeProduct.id) ? 'Remove from Wishlist' : 'Add to Wishlist'}
-              </button>
-              <button className="bg-[#35404f] text-white px-4 py-2 text-xs flex items-center hover:bg-gray-700 transition">
-                <Check size={12} className="mr-1" /> Add to Compare
               </button>
             </div>
 
