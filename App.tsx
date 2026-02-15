@@ -170,24 +170,31 @@ const CustomerReviews = () => {
   const [currentReview, setCurrentReview] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Fetch approved reviews from WooCommerce
+  // Fetch approved reviews from WooCommerce + attach locally saved images
   useEffect(() => {
     const fetchReviews = async () => {
       try {
         const fetchedReviews = await api.getReviews();
-        if (fetchedReviews.length > 0) {
-          // Load any locally saved uploaded images
-          let savedImages: Record<string, string> = {};
-          try { savedImages = JSON.parse(localStorage.getItem('reviewImages') || '{}'); } catch (_) {}
 
-          const formattedReviews = fetchedReviews.map(r => ({
-            id: r.id,
-            name: r.name,
-            rating: r.rating,
-            text: r.text,
-            image: r.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=EE6348&color=fff&size=200`,
-            uploadedImage: savedImages[r.email || ''] || undefined
-          }));
+        if (fetchedReviews.length > 0) {
+          // Load locally saved reviews to match uploaded images
+          let localReviews: any[] = [];
+          try { localReviews = JSON.parse(localStorage.getItem('localReviews') || '[]'); } catch (_) {}
+
+          const formattedReviews = fetchedReviews.map(r => {
+            // Find matching local review to attach uploaded image
+            const localMatch = localReviews.find(l =>
+              l.email === r.email && l.text.slice(0, 30) === r.text.slice(0, 30)
+            );
+            return {
+              id: r.id,
+              name: r.name,
+              rating: r.rating,
+              text: r.text,
+              image: r.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=EE6348&color=fff&size=200`,
+              uploadedImage: localMatch?.uploadedImage || undefined
+            };
+          });
           setReviews(formattedReviews);
         }
       } catch (error) {
@@ -1557,14 +1564,20 @@ const App: React.FC = () => {
           onClose={() => setShowReviewModal(false)}
           onSubmit={async (data) => {
             await api.submitReview(data);
-            // Save uploaded image to localStorage so it can be shown with the review
-            if (data.image) {
-              try {
-                const savedImages = JSON.parse(localStorage.getItem('reviewImages') || '{}');
-                savedImages[data.authorEmail] = data.image;
-                localStorage.setItem('reviewImages', JSON.stringify(savedImages));
-              } catch (_) {}
-            }
+            // Save full review locally so it appears immediately (even before admin approval)
+            try {
+              const localReviews = JSON.parse(localStorage.getItem('localReviews') || '[]');
+              localReviews.unshift({
+                id: Date.now(),
+                name: data.authorName || 'Guest',
+                email: data.authorEmail,
+                text: data.text,
+                rating: data.rating || 5,
+                uploadedImage: data.image || null,
+                date: new Date().toISOString()
+              });
+              localStorage.setItem('localReviews', JSON.stringify(localReviews));
+            } catch (_) {}
             setToast({ message: 'Thank you! Your review has been submitted.', visible: true });
             setTimeout(() => setToast((p) => ({ ...p, visible: false })), 4000);
             setShowReviewModal(false);
