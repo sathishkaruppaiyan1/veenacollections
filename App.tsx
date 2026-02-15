@@ -1657,24 +1657,27 @@ const App: React.FC = () => {
           attributes={productAttributes}
           selectedAttributes={selectedFilterAttributes}
           toggleAttribute={toggleAttributeFilter}
+          onResetFilters={() => {
+            setPriceRange([0, 1000]);
+            setShowOutOfStock(false);
+            setSelectedFilterAttributes({});
+          }}
           endContent={
-            <>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Sort by</span>
-                <select
-                  className="border border-gray-300 p-1.5 text-sm text-gray-600 focus:outline-none focus:border-[#EE6348]"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                >
-                  <option value="date-desc">Date: New to Old</option>
-                  <option value="date-asc">Date: Old to New</option>
-                  <option value="name-asc">Name: A to Z</option>
-                  <option value="name-desc">Name: Z to A</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                </select>
-              </div>
-            </>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Sort by</span>
+              <select
+                className="border border-gray-300 p-1.5 text-sm text-gray-600 focus:outline-none focus:border-[#EE6348]"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="date-desc">Date: New to Old</option>
+                <option value="date-asc">Date: Old to New</option>
+                <option value="name-asc">Name: A to Z</option>
+                <option value="name-desc">Name: Z to A</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+              </select>
+            </div>
           }
         />
 
