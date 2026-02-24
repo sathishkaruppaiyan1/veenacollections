@@ -142,27 +142,24 @@ const DealOfTheDay = ({ onNavigate, onProductClick, onAddToCart, onToggleWishlis
 
 const CustomerReviews = () => {
   // Default/fallback reviews shown while loading or if no reviews exist
-  const defaultReviews: Array<{ id: number; name: string; rating: number; text: string; image: string; uploadedImage?: string }> = [
+  const defaultReviews: Array<{ id: number; name: string; rating: number; text: string; uploadedImage?: string }> = [
     {
       id: 1,
       name: "Sarah Johnson",
       rating: 5,
-      text: "Absolutely stunning saree! The craftsmanship is incredible and it looks even better in person. Fast shipping too.",
-      image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?q=80&w=2574&auto=format&fit=crop"
+      text: "Absolutely stunning saree! The craftsmanship is incredible and it looks even better in person. Fast shipping too."
     },
     {
       id: 2,
       name: "Michael Chen",
       rating: 4,
-      text: "Great quality for the price. The fabric is very comfortable. Would definitely recommend Veena Collections.",
-      image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?q=80&w=2670&auto=format&fit=crop"
+      text: "Great quality for the price. The fabric is very comfortable. Would definitely recommend Veena Collections."
     },
     {
       id: 3,
       name: "Emily Davis",
       rating: 5,
-      text: "I bought the silver jewelry set for my sister and she loves it. The packaging was beautiful and premium.",
-      image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?q=80&w=2670&auto=format&fit=crop"
+      text: "I bought the silver jewelry set for my sister and she loves it. The packaging was beautiful and premium."
     }
   ];
 
@@ -170,35 +167,54 @@ const CustomerReviews = () => {
   const [currentReview, setCurrentReview] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Fetch approved reviews from WooCommerce + attach locally saved images
+  // Fetch approved reviews from WooCommerce + merge with local pending reviews
   useEffect(() => {
     const fetchReviews = async () => {
       try {
+        // Load locally saved reviews first
+        let localReviews: any[] = [];
+        try { localReviews = JSON.parse(localStorage.getItem('localReviews') || '[]'); } catch (_) {}
+
         const fetchedReviews = await api.getReviews();
+        
+        // Merge API reviews with local reviews (avoid duplicates)
+        const apiReviewEmails = new Set(fetchedReviews.map(r => r.email?.toLowerCase()));
+        
+        // Format API reviews
+        const formattedApiReviews = fetchedReviews.map(r => {
+          // Find matching local review to attach uploaded image
+          const localMatch = localReviews.find(l =>
+            l.email?.toLowerCase() === r.email?.toLowerCase() && 
+            l.text.slice(0, 30) === r.text.slice(0, 30)
+          );
+          return {
+            id: r.id,
+            name: r.name,
+            rating: r.rating,
+            text: r.text,
+            uploadedImage: localMatch?.uploadedImage || undefined
+          };
+        });
 
-        if (fetchedReviews.length > 0) {
-          // Load locally saved reviews to match uploaded images
-          let localReviews: any[] = [];
-          try { localReviews = JSON.parse(localStorage.getItem('localReviews') || '[]'); } catch (_) {}
+        // Add local reviews that aren't in API yet (pending approval)
+        const pendingLocalReviews = localReviews
+          .filter(l => !apiReviewEmails.has(l.email?.toLowerCase()))
+          .map(l => ({
+            id: l.id,
+            name: l.name,
+            rating: l.rating,
+            text: l.text,
+            uploadedImage: l.uploadedImage || undefined
+          }));
 
-          const formattedReviews = fetchedReviews.map(r => {
-            // Find matching local review to attach uploaded image
-            const localMatch = localReviews.find(l =>
-              l.email === r.email && l.text.slice(0, 30) === r.text.slice(0, 30)
-            );
-            return {
-              id: r.id,
-              name: r.name,
-              rating: r.rating,
-              text: r.text,
-              image: r.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=EE6348&color=fff&size=200`,
-              uploadedImage: localMatch?.uploadedImage || undefined
-            };
-          });
-          setReviews(formattedReviews);
-        }
+        // Combine: local pending reviews first, then API approved reviews
+        const allReviews = [...pendingLocalReviews, ...formattedApiReviews];
+        
+        // Always show reviews - use fetched/local if available, otherwise defaults
+        setReviews(allReviews.length > 0 ? allReviews : defaultReviews);
       } catch (error) {
         console.error("Failed to fetch reviews:", error);
+        // Keep default reviews on error
       } finally {
         setLoading(false);
       }
@@ -233,36 +249,40 @@ const CustomerReviews = () => {
             </div>
           ) : (
             <>
-              <div className="relative min-h-[180px] flex flex-col md:flex-row items-center gap-8 transition-all duration-500">
-                {/* Review Image or Avatar */}
-                <div className="w-32 h-32 md:w-48 md:h-48 flex-shrink-0 rounded-lg overflow-hidden border border-gray-100 shadow-sm">
+              <div className="relative min-h-[180px] flex flex-col items-center transition-all duration-500">
+                {/* User Avatar */}
+                <div className="w-16 h-16 flex-shrink-0 rounded-full overflow-hidden border-2 border-[#EE6348] shadow-md mb-4">
                   <img
-                    src={reviews[currentReview]?.image}
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(reviews[currentReview]?.name || 'User')}&background=EE6348&color=fff&size=128`}
                     alt={reviews[currentReview]?.name}
                     className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(reviews[currentReview]?.name || 'User')}&background=EE6348&color=fff&size=200`;
-                    }}
                   />
                 </div>
 
                 {/* Review Content */}
-                <div className="flex-1 text-center md:text-left">
-                  <div className="flex justify-center md:justify-start mb-4 text-[#EE6348]">
+                <div className="flex-1 text-center">
+                  <div className="flex justify-center mb-4 text-[#EE6348]">
                     {[...Array(5)].map((_, i) => (
                       <Star key={i} size={20} fill={i < (reviews[currentReview]?.rating || 5) ? "currentColor" : "none"} stroke="currentColor" className={i < (reviews[currentReview]?.rating || 5) ? "" : "text-gray-300"} />
                     ))}
                   </div>
-                  <p className="text-gray-600 text-lg italic mb-4 leading-relaxed">"{reviews[currentReview]?.text}"</p>
+                  <p className="text-gray-600 text-lg italic mb-4 leading-relaxed max-w-3xl mx-auto">"{reviews[currentReview]?.text}"</p>
+                  
+                  {/* User uploaded image as small tile */}
                   {reviews[currentReview]?.uploadedImage && (
-                    <div className="mb-4">
+                    <div className="mb-4 flex justify-center">
                       <img
                         src={reviews[currentReview].uploadedImage}
                         alt="Review photo"
-                        className="max-w-[200px] max-h-[200px] object-cover rounded-lg border border-gray-200 shadow-sm"
+                        className="w-20 h-20 object-cover rounded border border-gray-200 shadow-sm hover:scale-110 transition-transform cursor-pointer"
+                        onClick={() => {
+                          // Optional: could open full-size image in modal
+                          window.open(reviews[currentReview].uploadedImage, '_blank');
+                        }}
                       />
                     </div>
                   )}
+                  
                   <div>
                     <h4 className="font-bold text-gray-800 uppercase tracking-wide">{reviews[currentReview]?.name}</h4>
                     <span className="text-xs text-gray-500">Verified Buyer</span>
@@ -484,11 +504,29 @@ const App: React.FC = () => {
   };
 
   const updateCartQuantity = (id: number, variationId: number | undefined, change: number) => {
+    setCart(prev => {
+      return prev.map(item => {
+        if (item.id === id && item.variationId === variationId) {
+          const newQty = item.quantity + change;
+          if (newQty <= 0) {
+            // Remove item from cart when quantity reaches 0
+            return null;
+          }
+          return { ...item, quantity: newQty };
+        }
+        return item;
+      }).filter(Boolean) as typeof prev;
+    });
+  };
+
+  const setCartItemQuantity = (id: number, variationId: number | undefined, qty: number) => {
+    if (qty <= 0) {
+      removeFromCart(id, variationId);
+      return;
+    }
     setCart(prev => prev.map(item => {
       if (item.id === id && item.variationId === variationId) {
-        const newQty = item.quantity + change;
-        if (newQty <= 0) return item; // Don't allow 0 or negative
-        return { ...item, quantity: newQty };
+        return { ...item, quantity: Math.max(1, qty) };
       }
       return item;
     }));
@@ -1503,6 +1541,9 @@ const App: React.FC = () => {
                   src={cat.image}
                   alt={cat.name}
                   className="w-full h-full object-cover transition duration-500 group-hover:scale-110"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cat.name)}&background=B8A99A&color=fff&size=400&bold=true`;
+                  }}
                 />
 
                 {/* White Overlay Scale Animation */}
@@ -1563,25 +1604,40 @@ const App: React.FC = () => {
           isOpen={showReviewModal}
           onClose={() => setShowReviewModal(false)}
           onSubmit={async (data) => {
-            await api.submitReview(data);
-            // Save full review locally so it appears immediately (even before admin approval)
             try {
+              await api.submitReview(data);
+              
+              // Save full review locally so it appears immediately (even before admin approval)
               const localReviews = JSON.parse(localStorage.getItem('localReviews') || '[]');
-              localReviews.unshift({
+              const newReview = {
                 id: Date.now(),
                 name: data.authorName || 'Guest',
-                email: data.authorEmail,
+                email: data.authorEmail || '',
                 text: data.text,
                 rating: data.rating || 5,
                 uploadedImage: data.image || null,
                 date: new Date().toISOString()
-              });
-              localStorage.setItem('localReviews', JSON.stringify(localReviews));
-            } catch (_) {}
-            setToast({ message: 'Thank you! Your review has been submitted.', visible: true });
-            setTimeout(() => setToast((p) => ({ ...p, visible: false })), 4000);
-            setShowReviewModal(false);
-            setReviewRefreshKey(prev => prev + 1);
+              };
+              
+              // Remove any existing review with same email to avoid duplicates
+              const filteredReviews = localReviews.filter((r: any) => 
+                r.email?.toLowerCase() !== newReview.email.toLowerCase()
+              );
+              
+              filteredReviews.unshift(newReview);
+              localStorage.setItem('localReviews', JSON.stringify(filteredReviews));
+              
+              setToast({ message: 'Thank you! Your review has been submitted and will appear shortly.', visible: true });
+              setTimeout(() => setToast((p) => ({ ...p, visible: false })), 4000);
+              setShowReviewModal(false);
+              
+              // Force component remount to show new review
+              setReviewRefreshKey(prev => prev + 1);
+            } catch (error) {
+              console.error('Review submission error:', error);
+              setToast({ message: 'Error submitting review. Please try again.', visible: true });
+              setTimeout(() => setToast((p) => ({ ...p, visible: false })), 4000);
+            }
           }}
         />
 
@@ -1595,10 +1651,57 @@ const App: React.FC = () => {
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const filteredLengthRef = useRef(0);
 
+    // Get products for current category (before applying price/attribute filters)
+    const categoryProducts = useMemo(() => {
+      return products.filter(p => {
+        if (currentCategory && p.category.toLowerCase() !== currentCategory.toLowerCase()) return false;
+        return true;
+      });
+    }, [products, currentCategory]);
+
+    // Calculate dynamic price range from category products
+    const availablePriceRange = useMemo(() => {
+      if (categoryProducts.length === 0) return { min: 0, max: 1000 };
+      const prices = categoryProducts.map(p => p.price);
+      return {
+        min: Math.floor(Math.min(...prices)),
+        max: Math.ceil(Math.max(...prices))
+      };
+    }, [categoryProducts]);
+
+    // Filter attributes to only show those available in current category
+    const availableAttributes = useMemo(() => {
+      if (categoryProducts.length === 0) return [];
+      
+      // Collect all unique attributes from category products
+      const attrMap = new Map<string, Set<string>>();
+      
+      categoryProducts.forEach(product => {
+        product.attributes?.forEach(attr => {
+          if (attr.variation) {
+            if (!attrMap.has(attr.name)) {
+              attrMap.set(attr.name, new Set());
+            }
+            attr.options.forEach(opt => attrMap.get(attr.name)?.add(opt));
+          }
+        });
+      });
+
+      // Match with full attribute data from productAttributes
+      return productAttributes
+        .filter(attr => attrMap.has(attr.name))
+        .map(attr => ({
+          ...attr,
+          terms: attr.terms?.filter((term: any) => 
+            attrMap.get(attr.name)?.has(term.name)
+          ) || []
+        }))
+        .filter(attr => attr.terms.length > 0);
+    }, [categoryProducts, productAttributes]);
+
     const filteredProducts = useMemo(() => {
-      return products
+      return categoryProducts
         .filter(p => {
-          if (currentCategory && p.category.toLowerCase() !== currentCategory.toLowerCase()) return false;
           if (p.price < priceRange[0] || p.price > priceRange[1]) return false;
           const hasSelectedAttributes = Object.entries(selectedFilterAttributes).every(([attrName, selectedTerms]) => {
             const terms = selectedTerms as string[];
@@ -1621,10 +1724,11 @@ const App: React.FC = () => {
             default: return new Date(b.date_created || 0).getTime() - new Date(a.date_created || 0).getTime();
           }
         });
-    }, [products, currentCategory, priceRange, selectedFilterAttributes, sortBy]);
+    }, [categoryProducts, priceRange, selectedFilterAttributes, sortBy]);
 
     filteredLengthRef.current = filteredProducts.length;
 
+    // Reset display count when filters change
     useEffect(() => {
       setDisplayCount(PAGE_SIZE);
     }, [currentCategory, priceRange, selectedFilterAttributes, sortBy]);
@@ -1656,7 +1760,7 @@ const App: React.FC = () => {
 
         <div className="mb-8 bg-gray-100 py-12 px-6 text-center border-b-4 border-[#EE6348]">
           <h1 className="text-4xl font-bold uppercase font-heading text-gray-800 tracking-wider">{currentCategory || "All Products"}</h1>
-          <p className="text-gray-500 mt-2 text-sm uppercase tracking-widest">Explore our exclusive collection</p>
+          <p className="text-gray-500 mt-2 text-sm uppercase tracking-widest">Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}</p>
         </div>
 
         {/* Filters and Sort in one line */}
@@ -1665,13 +1769,14 @@ const App: React.FC = () => {
           onCategoryClick={(cat) => handleNavigate('shop', cat)}
           priceRange={priceRange}
           setPriceRange={setPriceRange}
+          maxPrice={availablePriceRange.max}
           showOutOfStock={showOutOfStock}
           setShowOutOfStock={setShowOutOfStock}
-          attributes={productAttributes}
+          attributes={availableAttributes}
           selectedAttributes={selectedFilterAttributes}
           toggleAttribute={toggleAttributeFilter}
           onResetFilters={() => {
-            setPriceRange([0, 1000]);
+            setPriceRange([availablePriceRange.min, availablePriceRange.max]);
             setShowOutOfStock(false);
             setSelectedFilterAttributes({});
           }}
@@ -1763,17 +1868,26 @@ const App: React.FC = () => {
 
                 {activeProduct.attributes.filter(attr => attr.variation).map(attr => (
                   <div key={attr.id} className="flex flex-col">
-                    <label className="text-sm font-bold text-gray-700 mb-1">{attr.name}:</label>
-                    <select
-                      className="border border-gray-300 p-2 text-sm w-full md:w-1/2 focus:border-[#EE6348] outline-none"
-                      onChange={(e) => setSelectedAttributes(prev => ({ ...prev, [attr.name]: e.target.value }))}
-                      value={selectedAttributes[attr.name] || ""}
-                    >
-                      <option value="">Select {attr.name}</option>
-                      {attr.options.map((opt, i) => (
-                        <option key={i} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                    <label className="text-sm font-bold text-gray-700 mb-2">{attr.name}:</label>
+                    <div className="flex flex-wrap gap-2">
+                      {attr.options.map((opt, i) => {
+                        const isSelected = selectedAttributes[attr.name] === opt;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setSelectedAttributes(prev => ({ ...prev, [attr.name]: opt }))}
+                            className={`px-4 py-2 text-sm font-medium border rounded transition ${
+                              isSelected
+                                ? 'bg-[#EE6348] text-white border-[#EE6348]'
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-[#EE6348] hover:text-[#EE6348]'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1937,11 +2051,19 @@ const App: React.FC = () => {
                           <button
                             onClick={() => updateCartQuantity(item.id, item.variationId, -1)}
                             className="w-10 h-10 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
-                            disabled={item.quantity <= 1}
                           >
-                            <Minus size={16} className={item.quantity <= 1 ? 'text-gray-300' : 'text-gray-600'} />
+                            <Minus size={16} className="text-gray-600" />
                           </button>
-                          <span className="w-12 h-10 flex items-center justify-center text-sm font-bold text-gray-700 border-y border-gray-300">{item.quantity}</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 1;
+                              setCartItemQuantity(item.id, item.variationId, val);
+                            }}
+                            className="w-16 h-10 text-center text-sm font-bold text-gray-700 border-y border-gray-300 focus:outline-none focus:border-[#EE6348]"
+                          />
                           <button
                             onClick={() => updateCartQuantity(item.id, item.variationId, 1)}
                             className="w-10 h-10 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
@@ -1984,11 +2106,19 @@ const App: React.FC = () => {
                         <button
                           onClick={() => updateCartQuantity(item.id, item.variationId, -1)}
                           className="w-8 h-8 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
-                          disabled={item.quantity <= 1}
                         >
-                          <Minus size={14} className={item.quantity <= 1 ? 'text-gray-300' : 'text-gray-600'} />
+                          <Minus size={14} className="text-gray-600" />
                         </button>
-                        <span className="w-10 h-8 flex items-center justify-center text-sm font-bold text-gray-700 border-y border-gray-300">{item.quantity}</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 1;
+                            setCartItemQuantity(item.id, item.variationId, val);
+                          }}
+                          className="w-12 h-8 text-center text-sm font-bold text-gray-700 border-y border-gray-300 focus:outline-none focus:border-[#EE6348]"
+                        />
                         <button
                           onClick={() => updateCartQuantity(item.id, item.variationId, 1)}
                           className="w-8 h-8 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
@@ -2384,6 +2514,9 @@ const App: React.FC = () => {
                 src={cat.image}
                 alt={cat.name}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(cat.name)}&background=B8A99A&color=fff&size=400&bold=true`;
+                }}
               />
               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                 <span className="bg-white text-[#EE6348] font-bold px-4 py-2 uppercase text-sm tracking-widest transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">View</span>

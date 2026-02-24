@@ -195,14 +195,18 @@ export const api = {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return CATEGORIES;
 
-      const response = await fetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=true&per_page=100`);
+      // Fetch all categories including empty ones (hide_empty=false)
+      const response = await fetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=false&per_page=100&parent=0`);
       const data = await handleResponse(response);
+
+      console.log('Fetched categories:', data.length, data.map((c: any) => c.name));
 
       return data.map((item: any) => ({
         id: item.id,
         name: item.name,
+        count: item.count || 0,
         // WooCommerce categories usually have an 'image' object if set
-        image: item.image ? item.image.src : 'https://placehold.co/400x300?text=Category'
+        image: item.image?.src || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=B8A99A&color=fff&size=400&bold=true`
       }));
 
     } catch (error) {
@@ -489,16 +493,49 @@ export const api = {
   // -----------------------------------------------------------
   // 7c. Submit Review (saves as WooCommerce product review on a random product)
   // Uses WooCommerce REST API which authenticates with consumer key/secret
+  // Supports image upload to WordPress media library
   // -----------------------------------------------------------
   submitReview: async (args: {
     text: string;
+    image?: string; // Base64 data URL
     authorName?: string;
     authorEmail: string;
     rating?: number;
   }): Promise<void> => {
-    const { text, authorName, authorEmail, rating = 5 } = args;
+    const { text, image, authorName, authorEmail, rating = 5 } = args;
     if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
       throw new Error('WordPress is not configured. Set SITE_URL in api.ts.');
+    }
+
+    let imageHtml = '';
+    
+    // Upload image to WordPress media library if provided
+    if (image && image.startsWith('data:image/')) {
+      try {
+        // Convert base64 to blob
+        const response = await fetch(image);
+        const blob = await response.blob();
+        
+        // Create form data for media upload
+        const formData = new FormData();
+        formData.append('file', blob, 'review-image.jpg');
+        
+        // Upload to WordPress media
+        const mediaRes = await fetch(`${API_BASE}/wp/v2/media?${getAuthParams()}`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (mediaRes.ok) {
+          const mediaData = await mediaRes.json();
+          const imageUrl = mediaData.source_url || mediaData.guid?.rendered;
+          if (imageUrl) {
+            imageHtml = `<br><br><img src="${imageUrl}" alt="Review image" style="max-width: 400px; height: auto;" />`;
+          }
+        }
+      } catch (err) {
+        console.warn('Image upload failed, submitting review without image:', err);
+      }
     }
 
     // Pick a random product to attach the review to
@@ -513,12 +550,13 @@ export const api = {
     const randomProduct = products[Math.floor(Math.random() * products.length)];
 
     // Submit review via WooCommerce REST API with hold status so admin can moderate
+    const reviewContent = text + imageHtml;
     const res = await fetch(`${API_BASE}/wc/v3/products/reviews?${getAuthParams()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         product_id: randomProduct.id,
-        review: text,
+        review: reviewContent,
         reviewer: authorName || 'Guest',
         reviewer_email: authorEmail,
         rating: rating,

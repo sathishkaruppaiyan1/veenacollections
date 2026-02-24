@@ -12,6 +12,7 @@ interface FilterBarProps {
     onCategoryClick: (category: string) => void;
     priceRange: [number, number];
     setPriceRange: (range: [number, number]) => void;
+    maxPrice?: number;
     showOutOfStock: boolean;
     setShowOutOfStock: (show: boolean) => void;
     attributes: any[];
@@ -26,6 +27,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     onCategoryClick,
     priceRange,
     setPriceRange,
+    maxPrice = 1000,
     showOutOfStock,
     setShowOutOfStock,
     attributes,
@@ -46,7 +48,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     };
 
     const activeFilterCount = Object.values(selectedAttributes).reduce((sum, v) => sum + (v as string[]).length, 0)
-        + (priceRange[0] > 0 || priceRange[1] < 1000 ? 1 : 0)
+        + (priceRange[0] > 0 || priceRange[1] < maxPrice ? 1 : 0)
         + (showOutOfStock ? 1 : 0);
 
     return (
@@ -139,15 +141,22 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                                 <input
                                     type="range"
                                     min="0"
-                                    max="1000"
+                                    max={maxPrice}
                                     value={priceRange[1]}
                                     onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
                                     className="w-full accent-[#EE6348] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                                 />
                                 <div className="flex flex-wrap gap-2 mt-4">
-                                    <button onClick={() => setPriceRange([0, 50])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">Under $50</button>
-                                    <button onClick={() => setPriceRange([50, 200])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">$50 - $200</button>
-                                    <button onClick={() => setPriceRange([200, 1000])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">$200+</button>
+                                    {maxPrice >= 50 && (
+                                        <button onClick={() => setPriceRange([0, 50])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">Under $50</button>
+                                    )}
+                                    {maxPrice >= 200 && (
+                                        <button onClick={() => setPriceRange([50, 200])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">$50 - $200</button>
+                                    )}
+                                    {maxPrice > 200 && (
+                                        <button onClick={() => setPriceRange([200, maxPrice])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">$200+</button>
+                                    )}
+                                    <button onClick={() => setPriceRange([0, maxPrice])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">All Prices</button>
                                 </div>
                             </div>
                         )}

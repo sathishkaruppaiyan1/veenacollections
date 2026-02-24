@@ -56,13 +56,14 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen,
   const canAddToCart = !isVariable || !!currentVariation;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl overflow-hidden relative animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl overflow-hidden relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 z-10"
+          className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-lg border border-gray-200 text-gray-600 hover:bg-[#EE6348] hover:text-white hover:border-[#EE6348] transition-all duration-200"
+          aria-label="Close"
         >
-          <X size={24} />
+          <X size={20} />
         </button>
 
         <div className="flex flex-col md:flex-row">
@@ -100,17 +101,26 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen,
                 {variationLoading && <div className="text-xs text-[#EE6348]">Loading options…</div>}
                 {variationAttrs.map((attr) => (
                   <div key={attr.id} className="flex flex-col">
-                    <label className="text-sm font-bold text-gray-700 mb-1">{attr.name}</label>
-                    <select
-                      className="border border-gray-300 p-2 text-sm w-full max-w-[200px] focus:border-[#EE6348] outline-none"
-                      value={selectedAttributes[attr.name] || ''}
-                      onChange={(e) => setSelectedAttributes((s) => ({ ...s, [attr.name]: e.target.value }))}
-                    >
-                      <option value="">Select {attr.name}</option>
-                      {attr.options.map((opt, i) => (
-                        <option key={i} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                    <label className="text-sm font-bold text-gray-700 mb-2">{attr.name}</label>
+                    <div className="flex flex-wrap gap-2">
+                      {attr.options.map((opt, i) => {
+                        const isSelected = selectedAttributes[attr.name] === opt;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setSelectedAttributes((s) => ({ ...s, [attr.name]: opt }))}
+                            className={`px-4 py-2 text-sm font-medium border rounded transition ${
+                              isSelected
+                                ? 'bg-[#EE6348] text-white border-[#EE6348]'
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-[#EE6348] hover:text-[#EE6348]'
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
               </div>
