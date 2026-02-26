@@ -312,6 +312,7 @@ const CustomerReviews = () => {
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('home');
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [productQuantity, setProductQuantity] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
@@ -445,9 +446,10 @@ const App: React.FC = () => {
       window.history.pushState({ view: 'product', productId: id }, '', `?view=product&id=${id}`);
       window.scrollTo(0, 0);
 
-      // Reset variation state
+      // Reset variation state and quantity
       setVariations([]);
       setSelectedAttributes({});
+      setProductQuantity(1);
       setCurrentVariation(null);
 
       // If variable product, fetch variations
@@ -470,9 +472,10 @@ const App: React.FC = () => {
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
   };
 
-  const addToCart = (product: Product, opts?: { variation: Variation | null; selectedAttributes?: Record<string, string> }) => {
+  const addToCart = (product: Product, opts?: { variation?: Variation | null; selectedAttributes?: Record<string, string>; quantity?: number }) => {
     const useVariation = opts?.variation !== undefined ? opts.variation : currentVariation;
     const useSelected = opts?.selectedAttributes !== undefined ? opts.selectedAttributes : selectedAttributes;
+    const qtyToAdd = opts?.quantity || 1;
 
     if (product.type === 'variable' && !useVariation) {
       showToast('Please select all options before adding to cart');
@@ -484,7 +487,7 @@ const App: React.FC = () => {
       name: product.name,
       price: (useVariation ? useVariation.price : product.price),
       image: (useVariation && useVariation.image?.src) ? useVariation.image.src : product.image,
-      quantity: 1,
+      quantity: qtyToAdd,
       variationId: useVariation?.id,
       selectedAttributes: useVariation ? useSelected : undefined
     };
@@ -492,7 +495,7 @@ const App: React.FC = () => {
     setCart(prev => {
       const existing = prev.find(item => item.id === itemToAdd.id && item.variationId === itemToAdd.variationId);
       if (existing) {
-        return prev.map(item => item.id === itemToAdd.id && item.variationId === itemToAdd.variationId ? { ...item, quantity: item.quantity + 1 } : item);
+        return prev.map(item => item.id === itemToAdd.id && item.variationId === itemToAdd.variationId ? { ...item, quantity: item.quantity + qtyToAdd } : item);
       }
       return [...prev, itemToAdd];
     });
@@ -680,7 +683,10 @@ const App: React.FC = () => {
         // Get payment method title
         const paymentMethod = paymentGateways.find(g => g.id === selectedPayment);
 
+        console.log("Creating order with payment method:", selectedPayment);
+
         // Create order in WooCommerce
+        // WooCommerce Stripe plugin will handle payment processing server-side
         const order = await api.createOrder({
           billing: billing,
           line_items: cart.map(item => ({
@@ -692,6 +698,8 @@ const App: React.FC = () => {
           payment_method_title: paymentMethod?.title || selectedPayment,
           coupon_lines: appliedCoupon ? [{ code: appliedCoupon.code }] : undefined
         });
+
+        console.log("Order created:", order);
 
         setLastOrderId(order.id.toString());
         setCart([]);
@@ -869,11 +877,8 @@ const App: React.FC = () => {
                           onChange={() => setSelectedPayment(gateway.id)}
                           className="mt-1 accent-[#EE6348]"
                         />
-                        <div>
+                        <div className="flex-1">
                           <span className="text-sm font-bold text-gray-800">{gateway.title}</span>
-                          {gateway.description && (
-                            <p className="text-xs text-gray-500 mt-1">{gateway.description}</p>
-                          )}
                         </div>
                       </label>
                     ))}
@@ -1801,7 +1806,7 @@ const App: React.FC = () => {
 
         <div className="flex-1">
           {/* Product Grid - Full Width */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
             {filteredProducts.slice(0, displayCount).map(product => (
               <ProductCard
                 key={product.id}
@@ -1814,7 +1819,24 @@ const App: React.FC = () => {
               />
             ))}
           </div>
+          
+          {/* Loading more indicator */}
+          {displayCount < filteredProducts.length && (
+            <div className="text-center py-8">
+              <Loader2 className="animate-spin text-[#EE6348] mx-auto" size={32} />
+              <p className="text-sm text-gray-500 mt-2">Loading more products...</p>
+            </div>
+          )}
+          
+          {/* Sentinel for infinite scroll */}
           <div ref={loadMoreRef} className="h-10" aria-hidden="true" />
+          
+          {/* End message */}
+          {displayCount >= filteredProducts.length && filteredProducts.length > PAGE_SIZE && (
+            <div className="text-center py-8 text-gray-500 text-sm">
+              You've reached the end. Showing all {filteredProducts.length} products.
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1848,14 +1870,12 @@ const App: React.FC = () => {
           {/* Details */}
           <div className="w-full md:w-1/2">
             <h1 className="text-2xl font-bold text-gray-800 mb-4">{activeProduct.name}</h1>
-            <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.
-            </p>
-
-            <div className="border-t border-b border-gray-100 py-4 mb-6">
-              <span className="text-gray-500 text-sm mr-2">Manufacturer:</span>
-              <span className="text-[#EE6348]">Rado</span>
-            </div>
+            {(activeProduct.short_description || activeProduct.description) && (
+              <div 
+                className="text-sm text-gray-500 mb-6 leading-relaxed prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: activeProduct.short_description || activeProduct.description || '' }}
+              />
+            )}
 
             <div className="mb-6">
               <span className="text-3xl font-bold text-[#EE6348]">${displayPrice.toFixed(2)}</span>
@@ -1895,14 +1915,33 @@ const App: React.FC = () => {
 
             <div className="flex items-center space-x-4 mb-8">
               <div className="flex items-center border border-gray-300">
-                <input type="text" value="1" readOnly className="w-12 text-center py-2 text-sm text-gray-600 focus:outline-none" />
+                <input 
+                  type="number" 
+                  min="1"
+                  value={productQuantity} 
+                  onChange={(e) => setProductQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-12 text-center py-2 text-sm text-gray-600 focus:outline-none" 
+                />
                 <div className="flex flex-col border-l border-gray-300">
-                  <button className="px-1 text-gray-500 hover:bg-gray-100 text-[8px]">▲</button>
-                  <button className="px-1 text-gray-500 hover:bg-gray-100 text-[8px] border-t border-gray-300">▼</button>
+                  <button 
+                    onClick={() => setProductQuantity(prev => prev + 1)}
+                    className="px-1 text-gray-500 hover:bg-gray-100 text-[8px]"
+                  >
+                    ▲
+                  </button>
+                  <button 
+                    onClick={() => setProductQuantity(prev => Math.max(1, prev - 1))}
+                    className="px-1 text-gray-500 hover:bg-gray-100 text-[8px] border-t border-gray-300"
+                  >
+                    ▼
+                  </button>
                 </div>
               </div>
               <button
-                onClick={() => addToCart(activeProduct)}
+                onClick={() => {
+                  addToCart(activeProduct, { quantity: productQuantity });
+                  setProductQuantity(1); // Reset to 1 after adding
+                }}
                 className={`text-white px-8 py-2.5 font-bold uppercase text-sm transition flex items-center ${(activeProduct.type === 'variable' && !currentVariation) ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#EE6348] hover:bg-black'
                   }`}
               >

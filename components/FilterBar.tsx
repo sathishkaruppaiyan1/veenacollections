@@ -4,7 +4,7 @@ import { X, SlidersHorizontal, Check, ChevronDown } from 'lucide-react';
 interface Category {
     id: number;
     name: string;
-    count: number;
+    count?: number;
 }
 
 interface FilterBarProps {

@@ -46,24 +46,58 @@ export const api = {
         return MOCK_PRODUCTS;
       }
 
-      const response = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&per_page=20`);
-      const data = await handleResponse(response);
+      // Fetch all products - WooCommerce max per_page is 100, so we need pagination for more
+      let allProducts: any[] = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore && page <= 10) { // Safety limit: max 10 pages = 1000 products
+        const response = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&per_page=100&page=${page}&status=publish`);
+        
+        if (!response.ok) break;
+        
+        const data = await response.json();
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          allProducts = [...allProducts, ...data];
+          // Check if there are more pages (from response headers)
+          const totalPages = response.headers.get('X-WP-TotalPages');
+          if (totalPages && page >= parseInt(totalPages)) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        }
+      }
+
+      console.log(`Fetched ${allProducts.length} products from WooCommerce`);
 
       // Map WooCommerce Data to App Interface
-      return data.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        price: parseFloat(item.price || 0),
-        oldPrice: item.regular_price && item.sale_price ? parseFloat(item.regular_price) : undefined,
-        rating: Math.round(parseFloat(item.average_rating)) || 0,
-        // Use the first image or a placeholder
-        image: item.images && item.images.length > 0 ? item.images[0].src : 'https://placehold.co/600x600?text=No+Image',
-        category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
-        sku: item.sku,
-        type: item.type,
-        attributes: item.attributes || [],
-        date_created: item.date_created
-      }));
+      return allProducts.map((item: any) => {
+        console.log('Product descriptions:', {
+          name: item.name,
+          short_description: item.short_description,
+          description: item.description
+        });
+        
+        return {
+          id: item.id,
+          name: item.name,
+          price: parseFloat(item.price || 0),
+          oldPrice: item.regular_price && item.sale_price ? parseFloat(item.regular_price) : undefined,
+          rating: Math.round(parseFloat(item.average_rating)) || 0,
+          // Use the first image or a placeholder
+          image: item.images && item.images.length > 0 ? item.images[0].src : 'https://placehold.co/600x600?text=No+Image',
+          category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+          sku: item.sku,
+          type: item.type,
+          attributes: item.attributes || [],
+          date_created: item.date_created,
+          short_description: item.short_description || '',
+          description: item.description || ''
+        };
+      });
 
     } catch (error) {
       console.error("Failed to fetch products from API, using fallback:", error);
@@ -91,7 +125,9 @@ export const api = {
         category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
         sku: item.sku,
         type: item.type,
-        attributes: item.attributes || []
+        attributes: item.attributes || [],
+        short_description: item.short_description || '',
+        description: item.description || ''
       }));
     } catch (error) {
       console.error("Search failed:", error);
@@ -134,7 +170,7 @@ export const api = {
       const tagId = tagData[0].id;
 
       // Fetch products with the tag ID
-      const response = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&tag=${tagId}&per_page=20`);
+      const response = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&tag=${tagId}&per_page=100`);
       const data = await handleResponse(response);
 
       const products = data.map((item: any) => ({
@@ -746,7 +782,7 @@ export const api = {
       const response = await fetch(`${API_BASE}/wc/v3/payment_gateways?${getAuthParams()}`);
       const data = await handleResponse(response);
 
-      return data
+      const gateways = data
         .filter((gateway: any) => gateway.enabled)
         .map((gateway: any) => ({
           id: gateway.id,
@@ -754,6 +790,9 @@ export const api = {
           description: gateway.description || '',
           enabled: gateway.enabled
         }));
+
+      console.log("Payment gateways fetched:", gateways);
+      return gateways;
     } catch (error) {
       console.error("Failed to fetch payment gateways:", error);
       return [

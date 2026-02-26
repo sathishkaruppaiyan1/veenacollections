@@ -34,6 +34,8 @@ export interface Product {
   date_created: string;
   sale_price?: string;
   date_on_sale_to?: string; // ISO string for sale end date
+  short_description?: string; // HTML content
+  description?: string; // HTML content
 }
 
 export interface DealOfTheDayData {
@@ -62,6 +64,7 @@ export interface Category {
   id: number;
   name: string;
   image: string;
+  count?: number;
 }
 
 export interface NavItem {
