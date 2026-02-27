@@ -18,6 +18,9 @@ export interface Variation {
     name: string;
     option: string;
   }[];
+  stock_quantity?: number | null;
+  stock_status?: string;
+  manage_stock?: boolean;
 }
 
 export interface Product {
@@ -36,6 +39,9 @@ export interface Product {
   date_on_sale_to?: string; // ISO string for sale end date
   short_description?: string; // HTML content
   description?: string; // HTML content
+  stock_quantity?: number | null;
+  stock_status?: string; // 'instock', 'outofstock', 'onbackorder'
+  manage_stock?: boolean;
 }
 
 export interface DealOfTheDayData {
@@ -47,6 +53,7 @@ export interface CartItem extends Product {
   quantity: number;
   variationId?: number;
   selectedAttributes?: Record<string, string>;
+  maxQty?: number | null; // max purchasable qty from stock, null = unlimited
 }
 
 export interface Order {

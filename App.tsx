@@ -441,7 +441,6 @@ const App: React.FC = () => {
     const prod = products.find(p => p.id === id);
     if (prod) {
       setActiveProduct(prod);
-      // setView('product'); called inside handleNavigate logic usually, but here we do it manually to include productId in state
       setView('product');
       window.history.pushState({ view: 'product', productId: id }, '', `?view=product&id=${id}`);
       window.scrollTo(0, 0);
@@ -451,6 +450,15 @@ const App: React.FC = () => {
       setSelectedAttributes({});
       setProductQuantity(1);
       setCurrentVariation(null);
+
+      // Fetch fresh product data for real-time stock info
+      api.getProduct(id).then(freshProd => {
+        if (freshProd) {
+          setActiveProduct(freshProd);
+          // Also update the product in the products array so cart gets fresh stock data
+          setProducts(prev => prev.map(p => p.id === id ? { ...p, stock_quantity: freshProd.stock_quantity, stock_status: freshProd.stock_status, manage_stock: freshProd.manage_stock } : p));
+        }
+      });
 
       // If variable product, fetch variations
       if (prod.type === 'variable') {
@@ -472,6 +480,33 @@ const App: React.FC = () => {
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
   };
 
+  // ── Stock helpers ──────────────────────────────────────────
+  // Resolve the max purchasable qty.
+  // Priority: variation stock > product stock > unlimited (null)
+  const resolveMaxQty = (product: Product, variation?: Variation | null): number | null => {
+    console.log('resolveMaxQty called:', {
+      productId: product.id,
+      productManageStock: product.manage_stock,
+      productStockQty: product.stock_quantity,
+      variationId: variation?.id,
+      variationManageStock: variation?.manage_stock,
+      variationStockQty: variation?.stock_quantity,
+    });
+    if (variation && variation.manage_stock && variation.stock_quantity != null) {
+      return variation.stock_quantity;
+    }
+    if (product.manage_stock && product.stock_quantity != null) {
+      return product.stock_quantity;
+    }
+    return null;
+  };
+
+  // For cart items we already stored maxQty at add-time
+  const getCartItemMax = (item: CartItem): number | null => {
+    return item.maxQty ?? null;
+  };
+
+  // ── Cart functions (fresh) ───────────────────────────────
   const addToCart = (product: Product, opts?: { variation?: Variation | null; selectedAttributes?: Record<string, string>; quantity?: number }) => {
     const useVariation = opts?.variation !== undefined ? opts.variation : currentVariation;
     const useSelected = opts?.selectedAttributes !== undefined ? opts.selectedAttributes : selectedAttributes;
@@ -482,24 +517,45 @@ const App: React.FC = () => {
       return;
     }
 
-    const itemToAdd = {
-      id: product.id,
-      name: product.name,
-      price: (useVariation ? useVariation.price : product.price),
-      image: (useVariation && useVariation.image?.src) ? useVariation.image.src : product.image,
+    const maxQty = resolveMaxQty(product, useVariation);
+
+    const itemToAdd: CartItem = {
+      ...product,
+      price: useVariation ? useVariation.price : product.price,
+      image: (useVariation?.image?.src) ? useVariation.image.src : product.image,
       quantity: qtyToAdd,
       variationId: useVariation?.id,
-      selectedAttributes: useVariation ? useSelected : undefined
+      selectedAttributes: useVariation ? useSelected : undefined,
+      maxQty,
     };
 
     setCart(prev => {
-      const existing = prev.find(item => item.id === itemToAdd.id && item.variationId === itemToAdd.variationId);
+      const existing = prev.find(i => i.id === itemToAdd.id && i.variationId === itemToAdd.variationId);
+
       if (existing) {
-        return prev.map(item => item.id === itemToAdd.id && item.variationId === itemToAdd.variationId ? { ...item, quantity: item.quantity + qtyToAdd } : item);
+        let newQty = existing.quantity + qtyToAdd;
+        if (maxQty !== null && newQty > maxQty) {
+          newQty = maxQty;
+          showToast(`Only ${maxQty} available in stock`);
+        }
+        return prev.map(i =>
+          i.id === itemToAdd.id && i.variationId === itemToAdd.variationId
+            ? { ...i, quantity: newQty }
+            : i
+        );
       }
-      return [...prev, itemToAdd];
+
+      let finalQty = qtyToAdd;
+      if (maxQty !== null && finalQty > maxQty) {
+        finalQty = maxQty;
+        showToast(`Only ${maxQty} available in stock`);
+      }
+      return [...prev, { ...itemToAdd, quantity: finalQty }];
     });
-    showToast(`Added ${product.name} to cart`);
+
+    if (maxQty === null || qtyToAdd <= maxQty) {
+      showToast(`Added ${product.name} to cart`);
+    }
   };
 
   const removeFromCart = (id: number, variationId?: number) => {
@@ -507,32 +563,37 @@ const App: React.FC = () => {
   };
 
   const updateCartQuantity = (id: number, variationId: number | undefined, change: number) => {
-    setCart(prev => {
-      return prev.map(item => {
-        if (item.id === id && item.variationId === variationId) {
+    setCart(prev =>
+      prev
+        .map(item => {
+          if (item.id !== id || item.variationId !== variationId) return item;
           const newQty = item.quantity + change;
-          if (newQty <= 0) {
-            // Remove item from cart when quantity reaches 0
-            return null;
+          if (newQty <= 0) return null;
+          const max = getCartItemMax(item);
+          if (max !== null && newQty > max) {
+            showToast(`Only ${max} available in stock`);
+            return { ...item, quantity: max };
           }
           return { ...item, quantity: newQty };
-        }
-        return item;
-      }).filter(Boolean) as typeof prev;
-    });
+        })
+        .filter(Boolean) as CartItem[]
+    );
   };
 
   const setCartItemQuantity = (id: number, variationId: number | undefined, qty: number) => {
-    if (qty <= 0) {
-      removeFromCart(id, variationId);
-      return;
-    }
-    setCart(prev => prev.map(item => {
-      if (item.id === id && item.variationId === variationId) {
-        return { ...item, quantity: Math.max(1, qty) };
-      }
-      return item;
-    }));
+    if (qty <= 0) { removeFromCart(id, variationId); return; }
+    setCart(prev =>
+      prev.map(item => {
+        if (item.id !== id || item.variationId !== variationId) return item;
+        const max = getCartItemMax(item);
+        let finalQty = Math.max(1, qty);
+        if (max !== null && finalQty > max) {
+          finalQty = max;
+          showToast(`Only ${max} available in stock`);
+        }
+        return { ...item, quantity: finalQty };
+      })
+    );
   };
 
   const toggleWishlist = (product: Product) => {
@@ -571,8 +632,10 @@ const App: React.FC = () => {
           });
         });
         setCurrentVariation(match || null);
+        setProductQuantity(1); // Reset qty when variation changes (different stock)
       } else {
         setCurrentVariation(null);
+        setProductQuantity(1);
       }
     }
   }, [selectedAttributes, variations, activeProduct]);
@@ -1913,30 +1976,41 @@ const App: React.FC = () => {
               </div>
             )}
 
+            {(() => {
+              const max = resolveMaxQty(activeProduct, currentVariation);
+              return max !== null ? (
+                <p className={`text-sm font-semibold mb-3 ${max > 0 ? (max <= 3 ? 'text-orange-500' : 'text-green-600') : 'text-red-600'}`}>
+                  {max > 0 ? `${max} in stock` : 'Out of stock'}
+                </p>
+              ) : null;
+            })()}
+
             <div className="flex items-center space-x-4 mb-8">
-              <div className="flex items-center border border-gray-300">
-                <input 
-                  type="number" 
-                  min="1"
-                  value={productQuantity} 
-                  onChange={(e) => setProductQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-12 text-center py-2 text-sm text-gray-600 focus:outline-none" 
-                />
-                <div className="flex flex-col border-l border-gray-300">
-                  <button 
-                    onClick={() => setProductQuantity(prev => prev + 1)}
-                    className="px-1 text-gray-500 hover:bg-gray-100 text-[8px]"
-                  >
-                    ▲
-                  </button>
-                  <button 
-                    onClick={() => setProductQuantity(prev => Math.max(1, prev - 1))}
-                    className="px-1 text-gray-500 hover:bg-gray-100 text-[8px] border-t border-gray-300"
-                  >
-                    ▼
-                  </button>
-                </div>
+              {(() => { const maxStock = resolveMaxQty(activeProduct, currentVariation); const atMax = maxStock !== null && productQuantity >= maxStock; return (
+              <div className="inline-flex items-center bg-gray-50 rounded-full border border-gray-200">
+                <button
+                  onClick={() => setProductQuantity(prev => Math.max(1, prev - 1))}
+                  disabled={productQuantity <= 1}
+                  className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 ${productQuantity <= 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-[#EE6348] hover:text-white'}`}
+                >
+                  <Minus size={16} strokeWidth={2.5} />
+                </button>
+                <span className="w-12 text-center text-base font-bold text-gray-800 select-none">{productQuantity}</span>
+                <button
+                  onClick={() => setProductQuantity(prev => {
+                    if (maxStock !== null && prev >= maxStock) {
+                      showToast(`Only ${maxStock} available in stock`);
+                      return maxStock;
+                    }
+                    return prev + 1;
+                  })}
+                  disabled={atMax}
+                  className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 ${atMax ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-[#EE6348] hover:text-white'}`}
+                >
+                  <Plus size={16} strokeWidth={2.5} />
+                </button>
               </div>
+              ); })()}
               <button
                 onClick={() => {
                   addToCart(activeProduct, { quantity: productQuantity });
@@ -2086,30 +2160,27 @@ const App: React.FC = () => {
                       </td>
                       <td className="p-4 text-sm text-gray-600">${item.price.toFixed(2)}</td>
                       <td className="p-4">
-                        <div className="flex items-center">
-                          <button
-                            onClick={() => updateCartQuantity(item.id, item.variationId, -1)}
-                            className="w-10 h-10 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
-                          >
-                            <Minus size={16} className="text-gray-600" />
-                          </button>
-                          <input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 1;
-                              setCartItemQuantity(item.id, item.variationId, val);
-                            }}
-                            className="w-16 h-10 text-center text-sm font-bold text-gray-700 border-y border-gray-300 focus:outline-none focus:border-[#EE6348]"
-                          />
-                          <button
-                            onClick={() => updateCartQuantity(item.id, item.variationId, 1)}
-                            className="w-10 h-10 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
-                          >
-                            <Plus size={16} className="text-gray-600" />
-                          </button>
+                        {(() => { const max = getCartItemMax(item); const atMax = max !== null && item.quantity >= max; return (
+                        <div className="flex flex-col items-start gap-1">
+                          <div className="inline-flex items-center bg-gray-50 rounded-full border border-gray-200">
+                            <button
+                              onClick={() => updateCartQuantity(item.id, item.variationId, -1)}
+                              className="w-9 h-9 flex items-center justify-center rounded-full text-gray-500 hover:bg-[#EE6348] hover:text-white transition-all duration-200"
+                            >
+                              <Minus size={14} strokeWidth={2.5} />
+                            </button>
+                            <span className="w-10 text-center text-sm font-bold text-gray-800 select-none">{item.quantity}</span>
+                            <button
+                              onClick={() => updateCartQuantity(item.id, item.variationId, 1)}
+                              disabled={atMax}
+                              className={`w-9 h-9 flex items-center justify-center rounded-full transition-all duration-200 ${atMax ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-[#EE6348] hover:text-white'}`}
+                            >
+                              <Plus size={14} strokeWidth={2.5} />
+                            </button>
+                          </div>
+                          {max !== null && <span className="text-[10px] text-gray-400 pl-1">{max} available</span>}
                         </div>
+                        ); })()}
                       </td>
                       <td className="p-4 text-sm font-bold text-[#EE6348]">${(item.price * item.quantity).toFixed(2)}</td>
                     </tr>
@@ -2141,30 +2212,27 @@ const App: React.FC = () => {
                       <div className="text-sm text-gray-500 mt-1">${item.price.toFixed(2)}</div>
                     </div>
                     <div className="flex justify-between items-center mt-3">
-                      <div className="flex items-center">
-                        <button
-                          onClick={() => updateCartQuantity(item.id, item.variationId, -1)}
-                          className="w-8 h-8 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
-                        >
-                          <Minus size={14} className="text-gray-600" />
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 1;
-                            setCartItemQuantity(item.id, item.variationId, val);
-                          }}
-                          className="w-12 h-8 text-center text-sm font-bold text-gray-700 border-y border-gray-300 focus:outline-none focus:border-[#EE6348]"
-                        />
-                        <button
-                          onClick={() => updateCartQuantity(item.id, item.variationId, 1)}
-                          className="w-8 h-8 flex items-center justify-center border border-gray-300 hover:bg-gray-100 transition"
-                        >
-                          <Plus size={14} className="text-gray-600" />
-                        </button>
+                      {(() => { const max = getCartItemMax(item); const atMax = max !== null && item.quantity >= max; return (
+                      <div className="flex flex-col gap-0.5">
+                        <div className="inline-flex items-center bg-gray-50 rounded-full border border-gray-200">
+                          <button
+                            onClick={() => updateCartQuantity(item.id, item.variationId, -1)}
+                            className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-[#EE6348] hover:text-white transition-all duration-200"
+                          >
+                            <Minus size={13} strokeWidth={2.5} />
+                          </button>
+                          <span className="w-8 text-center text-sm font-bold text-gray-800 select-none">{item.quantity}</span>
+                          <button
+                            onClick={() => updateCartQuantity(item.id, item.variationId, 1)}
+                            disabled={atMax}
+                            className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 ${atMax ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-[#EE6348] hover:text-white'}`}
+                          >
+                            <Plus size={13} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                        {max !== null && <span className="text-[9px] text-gray-400 text-center">{max} available</span>}
                       </div>
+                      ); })()}
                       <span className="text-base font-bold text-[#EE6348]">${(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                   </div>

@@ -95,7 +95,10 @@ export const api = {
           attributes: item.attributes || [],
           date_created: item.date_created,
           short_description: item.short_description || '',
-          description: item.description || ''
+          description: item.description || '',
+          stock_quantity: item.stock_quantity ?? null,
+          stock_status: item.stock_status || 'instock',
+          manage_stock: item.manage_stock || false
         };
       });
 
@@ -127,7 +130,10 @@ export const api = {
         type: item.type,
         attributes: item.attributes || [],
         short_description: item.short_description || '',
-        description: item.description || ''
+        description: item.description || '',
+        stock_quantity: item.stock_quantity ?? null,
+        stock_status: item.stock_status || 'instock',
+        manage_stock: item.manage_stock || false
       }));
     } catch (error) {
       console.error("Search failed:", error);
@@ -186,7 +192,10 @@ export const api = {
         attributes: item.attributes || [],
         date_created: item.date_created,
         sale_price: item.sale_price,
-        date_on_sale_to: item.date_on_sale_to
+        date_on_sale_to: item.date_on_sale_to,
+        stock_quantity: item.stock_quantity ?? null,
+        stock_status: item.stock_status || 'instock',
+        manage_stock: item.manage_stock || false
       }));
 
       // Fetch timer end date from WordPress page "deal-timer"
@@ -299,6 +308,38 @@ export const api = {
   },
 
   // -----------------------------------------------------------
+  // 3b. Fetch Single Product (for real-time stock data)
+  // -----------------------------------------------------------
+  getProduct: async (productId: number): Promise<Product | null> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return null;
+      const response = await fetch(`${API_BASE}/wc/v3/products/${productId}?${getAuthParams()}`);
+      const item = await handleResponse(response);
+      return {
+        id: item.id,
+        name: item.name,
+        price: parseFloat(item.price || 0),
+        oldPrice: item.regular_price && item.sale_price ? parseFloat(item.regular_price) : undefined,
+        rating: Math.round(parseFloat(item.average_rating)) || 0,
+        image: item.images && item.images.length > 0 ? item.images[0].src : 'https://placehold.co/600x600?text=No+Image',
+        category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+        sku: item.sku,
+        type: item.type,
+        attributes: item.attributes || [],
+        date_created: item.date_created,
+        short_description: item.short_description || '',
+        description: item.description || '',
+        stock_quantity: item.stock_quantity ?? null,
+        stock_status: item.stock_status || 'instock',
+        manage_stock: item.manage_stock || false
+      };
+    } catch (error) {
+      console.error("Failed to fetch single product:", error);
+      return null;
+    }
+  },
+
+  // -----------------------------------------------------------
   // 4. Fetch Product Variations
   // -----------------------------------------------------------
   getProductVariations: async (productId: number): Promise<Variation[]> => {
@@ -308,14 +349,20 @@ export const api = {
       const response = await fetch(`${API_BASE}/wc/v3/products/${productId}/variations?${getAuthParams()}`);
       const data = await handleResponse(response);
 
-      return data.map((v: any) => ({
-        id: v.id,
-        price: parseFloat(v.price),
-        regular_price: v.regular_price ? parseFloat(v.regular_price) : undefined,
-        sale_price: v.sale_price ? parseFloat(v.sale_price) : undefined,
-        image: v.image,
-        attributes: v.attributes
-      }));
+      return data.map((v: any) => {
+        console.log('Variation stock data:', { id: v.id, manage_stock: v.manage_stock, stock_quantity: v.stock_quantity, stock_status: v.stock_status, attributes: v.attributes });
+        return {
+          id: v.id,
+          price: parseFloat(v.price),
+          regular_price: v.regular_price ? parseFloat(v.regular_price) : undefined,
+          sale_price: v.sale_price ? parseFloat(v.sale_price) : undefined,
+          image: v.image,
+          attributes: v.attributes,
+          stock_quantity: v.stock_quantity ?? null,
+          stock_status: v.stock_status || 'instock',
+          manage_stock: v.manage_stock || false
+        };
+      });
     } catch (error) {
       console.error("Failed to fetch variations:", error);
       return [];

@@ -9,7 +9,8 @@
       "Bash(powershell -Command \"Remove-Item -LiteralPath ''\\\\?\\\\C:\\\\Users\\\\sathi\\\\veenacollections\\\\nul'' -Force -ErrorAction SilentlyContinue; if \\(Test-Path ''C:\\\\Users\\\\sathi\\\\veenacollections\\\\nul''\\) { Write-Host ''File still exists'' } else { Write-Host ''File deleted'' }\")",
       "Bash(git -C \"C:/Users/sathi/veenacollections\" rm --cached nul)",
       "Bash(git -C \"C:/Users/sathi/veenacollections\" update-index --remove nul)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(npm run:*)"
     ]
   }
 }
