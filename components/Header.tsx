@@ -12,6 +12,7 @@ interface HeaderProps {
   siteLogo?: string;
   siteName?: string;
   isLoggedIn?: boolean;
+  userFirstName?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,7 +23,8 @@ export const Header: React.FC<HeaderProps> = ({
   menuItems,
   siteLogo,
   siteName = "VEENA COLLECTIONS",
-  isLoggedIn = false
+  isLoggedIn = false,
+  userFirstName
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,6 +86,14 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="bg-[#0b141b] text-gray-400 text-xs py-2 border-b border-gray-800">
         <div className="container mx-auto px-4 flex justify-end items-center">
           <div className="flex items-center space-x-6">
+            {isLoggedIn && userFirstName && (
+              <button
+                onClick={() => onNavigate('account', 'dashboard')}
+                className="flex items-center hover:text-white transition"
+              >
+                <span className="hidden sm:inline">Hello {userFirstName}</span>
+              </button>
+            )}
             <button
               onClick={() => onNavigate('track-order')}
               className="flex items-center hover:text-white transition"
@@ -160,7 +170,7 @@ export const Header: React.FC<HeaderProps> = ({
               )}
               <div className="hidden sm:block">
                 <h1 className="text-base md:text-lg font-bold text-gray-900 tracking-widest font-heading uppercase">{siteName}</h1>
-                <p className="text-[9px] text-gray-500 tracking-widest uppercase">Designed to Dazzle, Premium Quality.. Timeless Elegance</p>
+                <p className="text-[9px] text-gray-500 tracking-widest uppercase">Premium Quality... Timeless Elegance...</p>
               </div>
             </div>
 
@@ -249,12 +259,6 @@ export const Header: React.FC<HeaderProps> = ({
               className="text-white font-bold uppercase text-sm tracking-wide hover:bg-[#EE6348] transition px-5 py-3"
             >
               Deal of the Day
-            </button>
-            <button
-              onClick={() => onNavigate('rent')}
-              className="text-white font-bold uppercase text-sm tracking-wide hover:bg-[#EE6348] transition px-5 py-3"
-            >
-              Rent Me
             </button>
             <button
               onClick={() => onNavigate('page', 'about-us')}

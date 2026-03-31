@@ -26,10 +26,13 @@ export interface Variation {
 export interface Product {
   id: number;
   name: string;
+  slug?: string;
+  permalink?: string;
   price: number;
   oldPrice?: number;
   rating: number; // 0-5
   image: string;
+  images?: string[];
   sku?: string;
   category: string;
   type: string; // 'simple', 'variable', etc.
@@ -47,6 +50,30 @@ export interface Product {
 export interface DealOfTheDayData {
   products: Product[];
   saleEndDate: string | null; // The earliest sale end date among products
+}
+
+export interface HomeHeroBanner {
+  id: number;
+  image: string;
+  title: string;
+  subtitle?: string;
+  discount?: string;
+  buttonText?: string;
+  productId?: number;
+  category?: string;
+}
+
+export interface HomeReel {
+  id: number;
+  mediaUrl: string;
+  mediaType?: 'image' | 'video';
+  title?: string;
+  subtitle?: string;
+  priceText?: string;
+  buttonText?: string;
+  productId?: number;
+  productLink?: string;
+  category?: string;
 }
 
 export interface CartItem extends Product {

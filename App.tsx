@@ -11,8 +11,8 @@ import { CookieConsent } from './components/CookieConsent';
 import { CookiePolicy } from './components/CookiePolicy';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { api } from './api';
-import { Product, ViewState, CartItem, Category, NavItem, Variation, Order } from './types';
-import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, UserCircle2, Package, MapPin, LogOut, CreditCard, Quote, Tag, Truck, Phone, Mail } from 'lucide-react';
+import { Product, ViewState, CartItem, Category, NavItem, Variation, Order, HomeHeroBanner, HomeReel } from './types';
+import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, UserCircle2, Package, MapPin, LogOut, CreditCard, Quote, Tag, Truck, Phone, Mail, Play } from 'lucide-react';
 
 const DEFAULT_LOGO = "https://admin.theveenacollections.com/wp-content/uploads/2025/11/Blue-White-Modern-Minimalist-Name-Logo-2.png";
 
@@ -312,6 +312,7 @@ const CustomerReviews = () => {
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('home');
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [selectedProductImage, setSelectedProductImage] = useState<string | null>(null);
   const [productQuantity, setProductQuantity] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
@@ -326,6 +327,7 @@ const App: React.FC = () => {
   });
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
+  const userFirstName = user?.name?.trim()?.split(/\s+/)[0] || '';
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
@@ -640,6 +642,20 @@ const App: React.FC = () => {
     }
   }, [selectedAttributes, variations, activeProduct]);
 
+  useEffect(() => {
+    if (!activeProduct) {
+      setSelectedProductImage(null);
+      return;
+    }
+
+    if (currentVariation?.image?.src) {
+      setSelectedProductImage(currentVariation.image.src);
+      return;
+    }
+
+    setSelectedProductImage(activeProduct.images?.[0] || activeProduct.image);
+  }, [activeProduct, currentVariation]);
+
   // Handle Sidebar Attribute Toggles
   const toggleAttributeFilter = (attrName: string, termSlug: string) => {
     setSelectedFilterAttributes(prev => {
@@ -655,6 +671,15 @@ const App: React.FC = () => {
   // --- Views ---
 
   const [lastOrderId, setLastOrderId] = useState<string>('');
+
+  const getPreferredProductDescription = (product: Product): string => {
+    const hasMeaningfulHtml = (html?: string) =>
+      Boolean(html && html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').trim());
+
+    if (hasMeaningfulHtml(product.description)) return product.description!;
+    if (hasMeaningfulHtml(product.short_description)) return product.short_description!;
+    return '';
+  };
 
   const CheckoutView = () => {
     const [couponInput, setCouponInput] = useState('');
@@ -1504,47 +1529,108 @@ const App: React.FC = () => {
   };
 
   const HomeView = () => {
-    const slides = [
-      {
-        id: 1,
-        image: 'https://images.unsplash.com/photo-1610189012906-4783fda31c5d?q=80&w=2574&auto=format&fit=crop',
-        title: 'ELEGANT SAREES',
-        subtitle: 'TRADITIONAL & MODERN',
-        discount: 'Up to 30% Off'
-      },
-      {
-        id: 2,
-        image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?q=80&w=2670&auto=format&fit=crop',
-        title: 'LUXURY ACCESSORIES',
-        subtitle: 'GOLD & DIAMOND',
-        discount: 'New Arrivals'
-      },
-      {
-        id: 3,
-        image: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?q=80&w=2670&auto=format&fit=crop',
-        title: 'WEDDING COLLECTION',
-        subtitle: 'SPECIAL OCCASION',
-        discount: 'Flat 20% Off'
-      }
-    ];
-
+    const [heroBanners, setHeroBanners] = useState<HomeHeroBanner[]>([]);
+    const [homeReels, setHomeReels] = useState<HomeReel[]>([]);
     const [currentSlide, setCurrentSlide] = useState(0);
+    const reelsSliderRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-      const timer = setInterval(() => {
-        setCurrentSlide((prev) => (prev + 1) % slides.length);
-      }, 5000);
-      return () => clearInterval(timer);
+      api.getHomeHeroBanners().then(setHeroBanners).catch((e) => console.error('Hero banners:', e));
+      api.getHomeReels().then(setHomeReels).catch((e) => console.error('Home reels:', e));
     }, []);
 
-    // Helper to get Best Sellers (using reverse of products for demo variety)
-    const bestSellers = [...products].reverse().slice(0, 4);
+    useEffect(() => {
+      if (heroBanners.length <= 1) return;
+      const timer = setInterval(() => {
+        setCurrentSlide((prev) => (prev + 1) % heroBanners.length);
+      }, 5000);
+      return () => clearInterval(timer);
+    }, [heroBanners]);
+
+    const handleHomeContentClick = (item: { productId?: number; category?: string }) => {
+      if (item.productId) {
+        handleProductClick(item.productId);
+        return;
+      }
+      if (item.category) {
+        handleNavigate('shop', item.category);
+        return;
+      }
+      handleNavigate('shop');
+    };
+
+    const scrollReels = (direction: 'left' | 'right') => {
+      const container = reelsSliderRef.current;
+      if (!container) return;
+      const cardWidth = container.clientWidth < 768 ? container.clientWidth * 0.78 : 320;
+      container.scrollBy({
+        left: direction === 'right' ? cardWidth : -cardWidth,
+        behavior: 'smooth'
+      });
+    };
+
+    const reelCards = (homeReels.length > 0 ? homeReels : products.slice(0, 4).map((product, index) => ({
+      id: index + 1,
+      mediaUrl: product.images?.[0] || product.image,
+      mediaType: 'image' as const,
+      title: product.name,
+      subtitle: product.category,
+      priceText: `$${product.price.toFixed(2)}`,
+      buttonText: 'Shop Now',
+      productId: product.id
+    }))).map((reel, index) => {
+      const productLink = reel.productLink?.trim();
+      const productSlugFromLink = productLink
+        ? productLink.replace(/\/+$/, '').split('/').filter(Boolean).pop()?.toLowerCase()
+        : '';
+      const linkedProduct = reel.productId
+        ? products.find((product) => product.id === reel.productId)
+        : products.find((product) =>
+            Boolean(
+              productLink && (
+                product.permalink?.toLowerCase() === productLink.toLowerCase() ||
+                product.slug?.toLowerCase() === productSlugFromLink
+              )
+            )
+          );
+      return {
+        ...reel,
+        id: reel.id || index + 1,
+        mediaType: reel.mediaType || 'video',
+        mediaUrl: reel.mediaUrl || linkedProduct?.images?.[0] || linkedProduct?.image || '',
+        title: reel.title || linkedProduct?.name || `Reel ${index + 1}`,
+        subtitle: reel.subtitle || linkedProduct?.category || reel.category || '',
+        priceText: reel.priceText || (linkedProduct ? `$${linkedProduct.price.toFixed(2)}` : ''),
+        buttonText: reel.buttonText || 'Shop Now',
+        category: reel.category || linkedProduct?.category,
+        productId: reel.productId || linkedProduct?.id,
+        productLink: reel.productLink || linkedProduct?.permalink
+      };
+    }).filter((reel) => Boolean(reel.mediaUrl));
+
+    useEffect(() => {
+      const container = reelsSliderRef.current;
+      if (!container || reelCards.length <= 1) return;
+
+      const interval = window.setInterval(() => {
+        const maxScrollLeft = container.scrollWidth - container.clientWidth;
+        const cardWidth = container.clientWidth < 768 ? container.clientWidth * 0.78 : 320;
+        const nextLeft = container.scrollLeft + cardWidth;
+
+        container.scrollTo({
+          left: nextLeft >= maxScrollLeft - 8 ? 0 : nextLeft,
+          behavior: 'smooth'
+        });
+      }, 3500);
+
+      return () => window.clearInterval(interval);
+    }, [reelCards.length]);
 
     return (
       <>
         {/* Hero Slider */}
         <div className="relative h-[500px] w-full bg-[#111] overflow-hidden">
-          {slides.map((slide, index) => (
+          {heroBanners.map((slide, index) => (
             <div
               key={slide.id}
               className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
@@ -1564,10 +1650,10 @@ const App: React.FC = () => {
                   <span className="text-xl tracking-wide uppercase">{slide.discount}</span>
                 </div>
                 <button
-                  onClick={() => handleNavigate('shop')}
+                  onClick={() => handleHomeContentClick(slide)}
                   className="bg-[#EE6348] text-white hover:bg-[#EE6348] transition font-bold uppercase px-8 py-3 text-sm tracking-wider shadow-lg animate-fade-in-up delay-300"
                 >
-                  Shop Now
+                  {slide.buttonText || 'Shop Now'}
                 </button>
               </div>
             </div>
@@ -1575,7 +1661,7 @@ const App: React.FC = () => {
 
           {/* Slider Dots */}
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
-            {slides.map((_, idx) => (
+            {heroBanners.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => setCurrentSlide(idx)}
@@ -1654,7 +1740,88 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        {/* Shop by Reels */}
+        <div className="container mx-auto px-4 mb-16">
+          <div className="flex items-end justify-between gap-4 mb-8">
+            <div>
+              <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Shop by Reels</h3>
+              <div className="w-12 h-0.5 bg-[#EE6348] mt-4"></div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => scrollReels('left')}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition hover:border-[#EE6348] hover:bg-[#EE6348] hover:text-white"
+                aria-label="Scroll reels left"
+              >
+                <ArrowLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollReels('right')}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition hover:border-[#EE6348] hover:bg-[#EE6348] hover:text-white"
+                aria-label="Scroll reels right"
+              >
+                <ArrowRight size={16} />
+              </button>
+              <button
+                onClick={() => handleNavigate('shop')}
+                className="text-sm font-bold uppercase tracking-wider text-[#EE6348] hover:text-black transition"
+              >
+                View All
+              </button>
+            </div>
+          </div>
 
+          <div
+            ref={reelsSliderRef}
+            className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {reelCards.map((reel, index) => (
+              <button
+                key={`reel-${reel.id}`}
+                type="button"
+                onClick={() => handleHomeContentClick(reel)}
+                className="group relative min-w-[72%] sm:min-w-[46%] lg:min-w-[23%] overflow-hidden rounded-2xl bg-black text-left aspect-[9/16] shadow-sm snap-start"
+              >
+                {reel.mediaType === 'video' ? (
+                  <video
+                    src={reel.mediaUrl}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    muted
+                    autoPlay
+                    loop
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={reel.mediaUrl}
+                    alt={reel.title}
+                    className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-black/10 to-black/80" />
+
+                <div className="absolute top-4 left-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.24em] text-white backdrop-blur-sm">
+                  <Play size={12} fill="currentColor" />
+                  Reel {index + 1}
+                </div>
+
+                <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+                  <p className="mb-2 text-[11px] uppercase tracking-[0.22em] text-white/75">{reel.subtitle}</p>
+                  <h4 className="line-clamp-2 text-sm font-bold uppercase leading-5">{reel.title}</h4>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="text-base font-bold text-[#ffd7c8]">{reel.priceText}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-white/30 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] transition group-hover:border-[#EE6348] group-hover:bg-[#EE6348]">
+                      {reel.buttonText}
+                      <ArrowRight size={12} />
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Customer Reviews */}
         <CustomerReviews key={reviewRefreshKey} />
@@ -1716,6 +1883,7 @@ const App: React.FC = () => {
   const ShopView = () => {
     const PAGE_SIZE = 12;
     const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const filteredLengthRef = useRef(0);
 
@@ -1799,24 +1967,35 @@ const App: React.FC = () => {
     // Reset display count when filters change
     useEffect(() => {
       setDisplayCount(PAGE_SIZE);
+      setIsLoadingMore(false);
     }, [currentCategory, priceRange, selectedFilterAttributes, sortBy]);
 
     useEffect(() => {
       const el = loadMoreRef.current;
       if (!el) return;
       const obs = new IntersectionObserver(
-        () => {
+        (entries) => {
+          const entry = entries[0];
+          if (!entry?.isIntersecting) return;
+
           setDisplayCount(prev => {
             const total = filteredLengthRef.current;
             if (prev >= total) return prev;
+            setIsLoadingMore(true);
             return Math.min(prev + PAGE_SIZE, total);
           });
         },
-        { rootMargin: '100px', threshold: 0 }
+        { rootMargin: '300px 0px', threshold: 0.01 }
       );
       obs.observe(el);
       return () => obs.disconnect();
     }, []);
+
+    useEffect(() => {
+      if (!isLoadingMore) return;
+      const timer = window.setTimeout(() => setIsLoadingMore(false), 250);
+      return () => window.clearTimeout(timer);
+    }, [isLoadingMore, displayCount]);
 
     return (
       <div className="container mx-auto px-4 py-8">
@@ -1884,7 +2063,7 @@ const App: React.FC = () => {
           </div>
           
           {/* Loading more indicator */}
-          {displayCount < filteredProducts.length && (
+          {isLoadingMore && displayCount < filteredProducts.length && (
             <div className="text-center py-8">
               <Loader2 className="animate-spin text-[#EE6348] mx-auto" size={32} />
               <p className="text-sm text-gray-500 mt-2">Loading more products...</p>
@@ -1908,9 +2087,15 @@ const App: React.FC = () => {
   const ProductView = () => {
     if (!activeProduct) return null;
 
-    // Use variation image/price if available, else product default
-    const displayImage = (currentVariation && currentVariation.image?.src) ? currentVariation.image.src : activeProduct.image;
+    const productGallery = activeProduct.images && activeProduct.images.length > 0
+      ? activeProduct.images
+      : [activeProduct.image];
+    const galleryImages = currentVariation?.image?.src
+      ? [currentVariation.image.src, ...productGallery.filter(img => img !== currentVariation.image?.src)]
+      : productGallery;
+    const displayImage = selectedProductImage || galleryImages[0] || activeProduct.image;
     const displayPrice = currentVariation ? currentVariation.price : activeProduct.price;
+    const productDescription = getPreferredProductDescription(activeProduct);
 
     return (
       <div className="container mx-auto px-4 py-8">
@@ -1928,15 +2113,32 @@ const App: React.FC = () => {
             <div className="border border-gray-200 p-4">
               <img src={displayImage} alt={activeProduct.name} className="w-full h-auto object-contain transition-all duration-300" />
             </div>
+            {galleryImages.length > 1 && (
+              <div className="mt-4 grid grid-cols-4 gap-3">
+                {galleryImages.map((image, index) => {
+                  const isActive = image === displayImage;
+                  return (
+                    <button
+                      key={`${activeProduct.id}-${index}-${image}`}
+                      type="button"
+                      onClick={() => setSelectedProductImage(image)}
+                      className={`border p-1 transition ${isActive ? 'border-[#EE6348]' : 'border-gray-200 hover:border-[#EE6348]'}`}
+                    >
+                      <img src={image} alt={`${activeProduct.name} ${index + 1}`} className="h-24 w-full object-cover" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Details */}
           <div className="w-full md:w-1/2">
             <h1 className="text-2xl font-bold text-gray-800 mb-4">{activeProduct.name}</h1>
-            {(activeProduct.short_description || activeProduct.description) && (
+            {productDescription && (
               <div 
                 className="text-sm text-gray-500 mb-6 leading-relaxed prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: activeProduct.short_description || activeProduct.description || '' }}
+                dangerouslySetInnerHTML={{ __html: productDescription }}
               />
             )}
 
@@ -2649,6 +2851,7 @@ const App: React.FC = () => {
         siteLogo={siteLogo || DEFAULT_LOGO}
         siteName={siteInfo.name}
         isLoggedIn={isLoggedIn}
+        userFirstName={userFirstName}
       />
 
       <main className="flex-1 bg-white">
@@ -2656,7 +2859,6 @@ const App: React.FC = () => {
         {view === 'shop' && <ShopView />}
         {view === 'categories' && <CategoriesView />}
         {view === 'deal' && <DealView />}
-        {view === 'rent' && <RentMeView />}
         {view === 'product' && <ProductView />}
         {view === 'cart' && <CartView />}
         {view === 'wishlist' && <WishlistView />}

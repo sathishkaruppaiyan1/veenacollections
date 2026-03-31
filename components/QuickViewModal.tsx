@@ -54,6 +54,13 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen,
   const variationAttrs = product.attributes?.filter((a) => a.variation) || [];
   const isVariable = product.type === 'variable';
   const canAddToCart = !isVariable || !!currentVariation;
+  const hasMeaningfulHtml = (html?: string) =>
+    Boolean(html && html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').trim());
+  const productDescription = hasMeaningfulHtml(product.description)
+    ? product.description!
+    : hasMeaningfulHtml(product.short_description)
+      ? product.short_description!
+      : '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
@@ -126,9 +133,12 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen,
               </div>
             )}
 
-            <p className="text-gray-600 mb-8 leading-relaxed">
-              Experience the quality and elegance of our {product.name}. Perfect for any occasion, crafted with attention to detail and style.
-            </p>
+            {productDescription && (
+              <div
+                className="text-gray-600 mb-8 leading-relaxed prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: productDescription }}
+              />
+            )}
 
             <button
               onClick={() => {

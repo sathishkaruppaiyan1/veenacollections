@@ -1,5 +1,5 @@
 import { MOCK_PRODUCTS, CATEGORIES, NAV_ITEMS } from './constants';
-import { Product, Category, NavItem, Variation, Order, DealOfTheDayData } from './types';
+import { Product, Category, NavItem, Variation, Order, DealOfTheDayData, HomeHeroBanner, HomeReel } from './types';
 
 // ==========================================
 // ⚙️ CONFIGURATION
@@ -34,6 +34,123 @@ const getAuthParams = () => {
   return `consumer_key=${WP_CONFIG.CONSUMER_KEY}&consumer_secret=${WP_CONFIG.CONSUMER_SECRET}`;
 };
 
+const mapProductImages = (item: any): string[] => {
+  if (!Array.isArray(item.images) || item.images.length === 0) {
+    return ['https://placehold.co/600x600?text=No+Image'];
+  }
+
+  const images = item.images
+    .map((img: any) => img?.src)
+    .filter((src: string | undefined): src is string => Boolean(src));
+
+  return images.length > 0 ? images : ['https://placehold.co/600x600?text=No+Image'];
+};
+
+const stripManufacturerHtml = (html?: string): string => {
+  if (!html) return '';
+
+  return html
+    .replace(/<p[^>]*>\s*(?:<strong[^>]*>\s*)?manufacturer\s*:?.*?<\/p>/gi, '')
+    .replace(/<li[^>]*>\s*(?:<strong[^>]*>\s*)?manufacturer\s*:?.*?<\/li>/gi, '')
+    .replace(/<tr[^>]*>\s*<t[dh][^>]*>\s*manufacturer\s*<\/t[dh]>\s*<t[dh][^>]*>.*?<\/t[dh]>\s*<\/tr>/gi, '')
+    .trim();
+};
+
+const wcFetch = (url: string) => fetch(url, { cache: 'no-store' });
+
+const decodeHtml = (html: string): string => {
+  if (typeof document !== 'undefined') {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = html;
+    return textarea.value;
+  }
+  return html
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+};
+
+const extractStructuredJson = <T>(renderedContent: string, fallback: T): T => {
+  try {
+    const decoded = decodeHtml(renderedContent)
+      .replace(/<a[^>]*href="([^"]+)"[^>]*>.*?<\/a>/gi, '$1')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/<pre[^>]*><code[^>]*>/gi, '')
+      .replace(/<\/code><\/pre>/gi, '')
+      .replace(/("image"\s*:\s*)""\s*,?\s*(https?:\/\/[^\s",]+)\s*(?="title"|"subtitle"|"discount"|"buttonText"|"productId"|"category"|[}\],])/gi, '$1"$2",')
+      .replace(/("image"\s*:\s*)"(https?:\/\/[^"]+)"\s*(?="title"|"subtitle"|"discount"|"buttonText"|"productId"|"category"|[}\],])/gi, '$1"$2",')
+      .replace(/("image"\s*:\s*)(https?:\/\/[^\s",]+)\s*(?="title"|"subtitle"|"discount"|"buttonText"|"productId"|"category"|[}\],])/gi, '$1"$2",')
+      .replace(/<[^>]*>/g, '')
+      .trim();
+
+    const jsonMatch = decoded.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+    if (!jsonMatch) return fallback;
+
+    return JSON.parse(jsonMatch[1]) as T;
+  } catch (error) {
+    console.warn('Failed to parse structured homepage content:', error);
+    return fallback;
+  }
+};
+
+const getAcfImageUrl = (value: any): string => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return '';
+  return value.url || value.source_url || value.sizes?.large || value.sizes?.medium_large || '';
+};
+
+const resolveMediaUrl = async (value: any): Promise<string> => {
+  const directUrl = getAcfImageUrl(value);
+  if (directUrl) return directUrl;
+
+  const mediaId = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && /^\d+$/.test(value)
+      ? Number(value)
+      : null;
+
+  if (!mediaId) return '';
+
+  try {
+    const response = await fetch(`${API_BASE}/wp/v2/media/${mediaId}`);
+    if (!response.ok) return '';
+    const media = await response.json();
+    return media?.source_url || media?.guid?.rendered || '';
+  } catch (error) {
+    console.warn(`Failed to resolve media ID ${mediaId}:`, error);
+    return '';
+  }
+};
+
+const normalizeHeroBanner = async (item: any, index: number): Promise<HomeHeroBanner> => ({
+  id: Number(item.id || index + 1),
+  image: await resolveMediaUrl(item.image || item.banner_image || item.hero_image),
+  title: item.title || item.banner_title || '',
+  subtitle: item.subtitle || item.banner_subtitle || '',
+  discount: item.discount || item.badge || item.offer_text || '',
+  buttonText: item.buttonText || item.button_text || item.cta_text || 'Shop Now',
+  productId: item.productId || item.product_id ? Number(item.productId || item.product_id) : undefined,
+  category: item.category || item.category_name || undefined
+});
+
+const normalizeHomeReel = async (item: any, index: number): Promise<HomeReel> => ({
+  id: Number(item.id || index + 1),
+  mediaUrl: await resolveMediaUrl(item.video || item.video_url || item.mediaUrl || item.media_url || item.image),
+  mediaType: item.mediaType || item.media_type || (item.video || item.video_url || item.mediaUrl || item.media_url ? 'video' : 'image'),
+  title: item.title || '',
+  subtitle: item.subtitle || item.caption || '',
+  priceText: item.priceText || item.price_text || '',
+  buttonText: item.buttonText || item.button_text || item.cta_text || 'Shop Now',
+  productId: item.productId || item.product_id ? Number(item.productId || item.product_id) : undefined,
+  productLink: item.productLink || item.product_link || '',
+  category: item.category || item.category_name || undefined
+});
+
 export const api = {
   // -----------------------------------------------------------
   // 1. Fetch Products from WooCommerce
@@ -52,7 +169,7 @@ export const api = {
       let hasMore = true;
 
       while (hasMore && page <= 10) { // Safety limit: max 10 pages = 1000 products
-        const response = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&per_page=100&page=${page}&status=publish`);
+        const response = await wcFetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&per_page=100&page=${page}&status=publish`);
         
         if (!response.ok) break;
         
@@ -75,6 +192,7 @@ export const api = {
 
       // Map WooCommerce Data to App Interface
       return allProducts.map((item: any) => {
+        const images = mapProductImages(item);
         console.log('Product descriptions:', {
           name: item.name,
           short_description: item.short_description,
@@ -84,18 +202,20 @@ export const api = {
         return {
           id: item.id,
           name: item.name,
+          slug: item.slug,
+          permalink: item.permalink,
           price: parseFloat(item.price || 0),
           oldPrice: item.regular_price && item.sale_price ? parseFloat(item.regular_price) : undefined,
           rating: Math.round(parseFloat(item.average_rating)) || 0,
-          // Use the first image or a placeholder
-          image: item.images && item.images.length > 0 ? item.images[0].src : 'https://placehold.co/600x600?text=No+Image',
+          images,
+          image: images[0],
           category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
           sku: item.sku,
           type: item.type,
           attributes: item.attributes || [],
           date_created: item.date_created,
-          short_description: item.short_description || '',
-          description: item.description || '',
+          short_description: stripManufacturerHtml(item.short_description),
+          description: stripManufacturerHtml(item.description),
           stock_quantity: item.stock_quantity ?? null,
           stock_status: item.stock_status || 'instock',
           manage_stock: item.manage_stock || false
@@ -115,26 +235,32 @@ export const api = {
         return MOCK_PRODUCTS.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
       }
 
-      const response = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&search=${encodeURIComponent(query)}&per_page=5`);
+      const response = await wcFetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&search=${encodeURIComponent(query)}&per_page=5`);
       const data = await handleResponse(response);
 
-      return data.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        price: parseFloat(item.price || 0),
-        oldPrice: item.regular_price && item.sale_price ? parseFloat(item.regular_price) : undefined,
-        rating: Math.round(parseFloat(item.average_rating)) || 0,
-        image: item.images && item.images.length > 0 ? item.images[0].src : 'https://placehold.co/600x600?text=No+Image',
-        category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
-        sku: item.sku,
-        type: item.type,
-        attributes: item.attributes || [],
-        short_description: item.short_description || '',
-        description: item.description || '',
-        stock_quantity: item.stock_quantity ?? null,
-        stock_status: item.stock_status || 'instock',
-        manage_stock: item.manage_stock || false
-      }));
+      return data.map((item: any) => {
+        const images = mapProductImages(item);
+        return {
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          permalink: item.permalink,
+          price: parseFloat(item.price || 0),
+          oldPrice: item.regular_price && item.sale_price ? parseFloat(item.regular_price) : undefined,
+          rating: Math.round(parseFloat(item.average_rating)) || 0,
+          images,
+          image: images[0],
+          category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+          sku: item.sku,
+          type: item.type,
+          attributes: item.attributes || [],
+          short_description: stripManufacturerHtml(item.short_description),
+          description: stripManufacturerHtml(item.description),
+          stock_quantity: item.stock_quantity ?? null,
+          stock_status: item.stock_status || 'instock',
+          manage_stock: item.manage_stock || false
+        };
+      });
     } catch (error) {
       console.error("Search failed:", error);
       return [];
@@ -165,7 +291,7 @@ export const api = {
       }
 
       // First, get the tag ID for "deal-of-the-day"
-      const tagResponse = await fetch(`${API_BASE}/wc/v3/products/tags?${getAuthParams()}&slug=deal-of-the-day`);
+      const tagResponse = await wcFetch(`${API_BASE}/wc/v3/products/tags?${getAuthParams()}&slug=deal-of-the-day`);
       const tagData = await tagResponse.json();
 
       if (!tagData || tagData.length === 0) {
@@ -176,27 +302,33 @@ export const api = {
       const tagId = tagData[0].id;
 
       // Fetch products with the tag ID
-      const response = await fetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&tag=${tagId}&per_page=100`);
+      const response = await wcFetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&tag=${tagId}&per_page=100`);
       const data = await handleResponse(response);
 
-      const products = data.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        price: parseFloat(item.price || 0),
-        oldPrice: item.regular_price ? parseFloat(item.regular_price) : undefined,
-        rating: Math.round(parseFloat(item.average_rating)) || 0,
-        image: item.images && item.images.length > 0 ? item.images[0].src : 'https://placehold.co/600x600?text=No+Image',
-        category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
-        sku: item.sku,
-        type: item.type,
-        attributes: item.attributes || [],
-        date_created: item.date_created,
-        sale_price: item.sale_price,
-        date_on_sale_to: item.date_on_sale_to,
-        stock_quantity: item.stock_quantity ?? null,
-        stock_status: item.stock_status || 'instock',
-        manage_stock: item.manage_stock || false
-      }));
+      const products = data.map((item: any) => {
+        const images = mapProductImages(item);
+        return {
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          permalink: item.permalink,
+          price: parseFloat(item.price || 0),
+          oldPrice: item.regular_price ? parseFloat(item.regular_price) : undefined,
+          rating: Math.round(parseFloat(item.average_rating)) || 0,
+          images,
+          image: images[0],
+          category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+          sku: item.sku,
+          type: item.type,
+          attributes: item.attributes || [],
+          date_created: item.date_created,
+          sale_price: item.sale_price,
+          date_on_sale_to: item.date_on_sale_to,
+          stock_quantity: item.stock_quantity ?? null,
+          stock_status: item.stock_status || 'instock',
+          manage_stock: item.manage_stock || false
+        };
+      });
 
       // Fetch timer end date from WordPress page "deal-timer"
       let saleEndDate: string | null = null;
@@ -241,7 +373,7 @@ export const api = {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return CATEGORIES;
 
       // Fetch all categories including empty ones (hide_empty=false)
-      const response = await fetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=false&per_page=100&parent=0`);
+      const response = await wcFetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=false&per_page=100&parent=0`);
       const data = await handleResponse(response);
 
       console.log('Fetched categories:', data.length, data.map((c: any) => c.name));
@@ -290,7 +422,7 @@ export const api = {
 
     // Attempt 2: Fallback to WooCommerce Categories
     try {
-      const catResponse = await fetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=true&parent=0&per_page=8`);
+      const catResponse = await wcFetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=true&parent=0&per_page=8`);
       if (catResponse.ok) {
         const data = await catResponse.json();
         return data.map((cat: any) => ({
@@ -313,22 +445,26 @@ export const api = {
   getProduct: async (productId: number): Promise<Product | null> => {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return null;
-      const response = await fetch(`${API_BASE}/wc/v3/products/${productId}?${getAuthParams()}`);
+      const response = await wcFetch(`${API_BASE}/wc/v3/products/${productId}?${getAuthParams()}`);
       const item = await handleResponse(response);
+      const images = mapProductImages(item);
       return {
         id: item.id,
         name: item.name,
+        slug: item.slug,
+        permalink: item.permalink,
         price: parseFloat(item.price || 0),
         oldPrice: item.regular_price && item.sale_price ? parseFloat(item.regular_price) : undefined,
         rating: Math.round(parseFloat(item.average_rating)) || 0,
-        image: item.images && item.images.length > 0 ? item.images[0].src : 'https://placehold.co/600x600?text=No+Image',
+        images,
+        image: images[0],
         category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
         sku: item.sku,
         type: item.type,
         attributes: item.attributes || [],
         date_created: item.date_created,
-        short_description: item.short_description || '',
-        description: item.description || '',
+        short_description: stripManufacturerHtml(item.short_description),
+        description: stripManufacturerHtml(item.description),
         stock_quantity: item.stock_quantity ?? null,
         stock_status: item.stock_status || 'instock',
         manage_stock: item.manage_stock || false
@@ -346,7 +482,7 @@ export const api = {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return [];
 
-      const response = await fetch(`${API_BASE}/wc/v3/products/${productId}/variations?${getAuthParams()}`);
+      const response = await wcFetch(`${API_BASE}/wc/v3/products/${productId}/variations?${getAuthParams()}`);
       const data = await handleResponse(response);
 
       return data.map((v: any) => {
@@ -443,6 +579,93 @@ export const api = {
     } catch (error) {
       console.warn("Could not fetch site logo, using default:", error);
       return KNOWN_LOGO;
+    }
+  },
+
+  getHomeHeroBanners: async (): Promise<HomeHeroBanner[]> => {
+    const fallback: HomeHeroBanner[] = [
+      {
+        id: 1,
+        image: 'https://images.unsplash.com/photo-1610189012906-4783fda31c5d?q=80&w=2574&auto=format&fit=crop',
+        title: 'ELEGANT SAREES',
+        subtitle: 'TRADITIONAL & MODERN',
+        discount: 'Up to 30% Off',
+        buttonText: 'Shop Now'
+      },
+      {
+        id: 2,
+        image: 'https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?q=80&w=2670&auto=format&fit=crop',
+        title: 'LUXURY ACCESSORIES',
+        subtitle: 'GOLD & DIAMOND',
+        discount: 'New Arrivals',
+        buttonText: 'Shop Now'
+      },
+      {
+        id: 3,
+        image: 'https://images.unsplash.com/photo-1583391733956-6c78276477e2?q=80&w=2670&auto=format&fit=crop',
+        title: 'WEDDING COLLECTION',
+        subtitle: 'SPECIAL OCCASION',
+        discount: 'Flat 20% Off',
+        buttonText: 'Shop Now'
+      }
+    ];
+
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return fallback;
+
+      const response = await fetch(`${API_BASE}/wp/v2/pages?slug=home-hero-banners&_fields=id,slug,acf,content`);
+      const data = await handleResponse(response);
+      if (!data || data.length === 0) return fallback;
+
+      const acf = data[0].acf;
+      const acfItems = acf?.home_hero_banners || acf?.hero_banners || acf?.banners;
+      if (Array.isArray(acfItems) && acfItems.length > 0) {
+        const normalized = (await Promise.all(
+          acfItems.map((item: any, index: number) => normalizeHeroBanner(item, index))
+        ))
+          .filter((item: HomeHeroBanner) => Boolean(item.image && item.title));
+        if (normalized.length > 0) return normalized;
+      }
+
+      const parsed = extractStructuredJson<HomeHeroBanner[]>(data[0].content?.rendered || '', fallback);
+      const normalizedParsed = Array.isArray(parsed)
+        ? (await Promise.all(parsed.map((item, index) => normalizeHeroBanner(item, index)))).filter((item) => Boolean(item.image && item.title))
+        : [];
+      return normalizedParsed.length > 0 ? normalizedParsed : fallback;
+    } catch (error) {
+      console.warn('Failed to fetch home hero banners, using fallback:', error);
+      return fallback;
+    }
+  },
+
+  getHomeReels: async (): Promise<HomeReel[]> => {
+    const fallback: HomeReel[] = [];
+
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return fallback;
+
+      const response = await fetch(`${API_BASE}/wp/v2/pages?slug=home-reels&_fields=id,slug,acf,content`);
+      const data = await handleResponse(response);
+      if (!data || data.length === 0) return fallback;
+
+      const acf = data[0].acf;
+      const acfItems = acf?.home_reels || acf?.reels || acf?.shop_by_reels;
+      if (Array.isArray(acfItems) && acfItems.length > 0) {
+        const normalized = (await Promise.all(
+          acfItems.map((item: any, index: number) => normalizeHomeReel(item, index))
+        ))
+          .filter((item: HomeReel) => Boolean(item.mediaUrl));
+        if (normalized.length > 0) return normalized;
+      }
+
+      const parsed = extractStructuredJson<HomeReel[]>(data[0].content?.rendered || '', fallback);
+      const normalizedParsed = Array.isArray(parsed)
+        ? (await Promise.all(parsed.map((item, index) => normalizeHomeReel(item, index)))).filter((item) => Boolean(item.mediaUrl))
+        : [];
+      return normalizedParsed;
+    } catch (error) {
+      console.warn('Failed to fetch home reels, using fallback:', error);
+      return fallback;
     }
   },
 
