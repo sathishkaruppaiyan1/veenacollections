@@ -35,6 +35,8 @@ export interface Product {
   images?: string[];
   sku?: string;
   category: string;
+  categories?: string[]; // All category names the product belongs to (for subcategory filtering)
+  categoryIds?: number[]; // All category IDs the product belongs to
   type: string; // 'simple', 'variable', etc.
   attributes: ProductAttribute[];
   date_created: string;
@@ -99,6 +101,8 @@ export interface Category {
   name: string;
   image: string;
   count?: number;
+  menu_order?: number;
+  parent?: number;
 }
 
 export interface NavItem {

@@ -7,6 +7,9 @@ interface FooterProps {
   onNavigate: (view: ViewState, param?: string) => void;
 }
 
+// Toggle to re-enable the newsletter strip above the footer in the future.
+const SHOW_NEWSLETTER = false;
+
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [newsletterEmail, setNewsletterEmail] = useState('');
@@ -38,42 +41,44 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
   return (
     <footer className="bg-[#0f1f2e] text-white mt-auto">
-      {/* Newsletter Strip - Visual match to theme */}
-      <div className="bg-[#EE6348] py-8 relative overflow-hidden">
-        <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between">
-          <div className="mb-4 md:mb-0 border-l-4 border-white pl-4">
-            <h3 className="text-xl font-bold uppercase tracking-wide">Newsletter</h3>
+      {/* Newsletter Strip - Temporarily hidden. Flip SHOW_NEWSLETTER to true to re-enable. */}
+      {SHOW_NEWSLETTER && (
+        <div className="bg-[#EE6348] py-8 relative overflow-hidden">
+          <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between">
+            <div className="mb-4 md:mb-0 border-l-4 border-white pl-4">
+              <h3 className="text-xl font-bold uppercase tracking-wide">Newsletter</h3>
+            </div>
+            {newsletterStatus === 'success' ? (
+              <p className="flex-1 max-w-xl mx-auto md:px-8 text-white font-semibold text-center md:text-left flex items-center justify-center gap-2">
+                <Mail size={20} className="flex-shrink-0" />
+                Thank you! You are now subscribed to Veena Collections updates and exclusive offers.
+              </p>
+            ) : (
+              <form onSubmit={handleNewsletterSubmit} className="flex-1 max-w-xl mx-auto w-full md:px-8">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="email"
+                    value={newsletterEmail}
+                    onChange={(e) => setNewsletterEmail(e.target.value)}
+                    placeholder="Enter your email here..."
+                    className="flex-1 px-4 py-2 text-gray-800 text-sm focus:outline-none rounded-l-sm sm:rounded-r-none rounded"
+                    disabled={newsletterStatus === 'loading'}
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={newsletterStatus === 'loading'}
+                    className="bg-white text-[#EE6348] font-bold px-6 py-2 text-sm uppercase rounded-r-sm rounded-l-sm sm:rounded-l-none flex items-center justify-center hover:bg-gray-100 transition disabled:opacity-70"
+                  >
+                    {newsletterStatus === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <><span className="mr-2">✉</span> Subscribe</>}
+                  </button>
+                </div>
+                {newsletterError && <p className="text-sm text-white/90 mt-2">{newsletterError}</p>}
+              </form>
+            )}
           </div>
-          {newsletterStatus === 'success' ? (
-            <p className="flex-1 max-w-xl mx-auto md:px-8 text-white font-semibold text-center md:text-left flex items-center justify-center gap-2">
-              <Mail size={20} className="flex-shrink-0" />
-              Thank you! You are now subscribed to Veena Collections updates and exclusive offers.
-            </p>
-          ) : (
-            <form onSubmit={handleNewsletterSubmit} className="flex-1 max-w-xl mx-auto w-full md:px-8">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="email"
-                  value={newsletterEmail}
-                  onChange={(e) => setNewsletterEmail(e.target.value)}
-                  placeholder="Enter your email here..."
-                  className="flex-1 px-4 py-2 text-gray-800 text-sm focus:outline-none rounded-l-sm sm:rounded-r-none rounded"
-                  disabled={newsletterStatus === 'loading'}
-                  required
-                />
-                <button
-                  type="submit"
-                  disabled={newsletterStatus === 'loading'}
-                  className="bg-white text-[#EE6348] font-bold px-6 py-2 text-sm uppercase rounded-r-sm rounded-l-sm sm:rounded-l-none flex items-center justify-center hover:bg-gray-100 transition disabled:opacity-70"
-                >
-                  {newsletterStatus === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <><span className="mr-2">✉</span> Subscribe</>}
-                </button>
-              </div>
-              {newsletterError && <p className="text-sm text-white/90 mt-2">{newsletterError}</p>}
-            </form>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Widget Areas */}
       <div className="container mx-auto px-4 py-8 lg:py-16">
@@ -108,11 +113,31 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <span className="flex items-center"><span className="text-[#EE6348] mr-2">›</span> CUSTOMER SERVICE</span>
               <ChevronDown className={`lg:hidden transition-transform duration-300 ${openSections['service'] ? 'rotate-180' : ''}`} size={16} />
             </h4>
-            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${openSections['service'] ? 'max-h-[300px] opacity-100 mb-4' : 'max-h-0 opacity-0 lg:max-h-full lg:opacity-100 lg:mb-0'}`}>
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${openSections['service'] ? 'max-h-[400px] opacity-100 mb-4' : 'max-h-0 opacity-0 lg:max-h-full lg:opacity-100 lg:mb-0'}`}>
               <ul className="space-y-3 text-gray-400">
                 <li className="hover:text-[#EE6348] transition text-gray-400">Email: theveenacollections@gmail.com</li>
                 <li className="hover:text-[#EE6348] transition text-gray-400">Whatsapp: (909) 913-2080 only</li>
               </ul>
+              <div className="flex space-x-3 mt-4">
+                <a
+                  href="https://www.instagram.com/theveenacollections/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Instagram"
+                  className="w-9 h-9 bg-black flex items-center justify-center hover:bg-[#EE6348] transition rounded-sm"
+                >
+                  <Instagram size={16} />
+                </a>
+                <a
+                  href="https://www.facebook.com/theveenacollections"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook"
+                  className="w-9 h-9 bg-black flex items-center justify-center hover:bg-[#EE6348] transition rounded-sm"
+                >
+                  <Facebook size={16} />
+                </a>
+              </div>
             </div>
           </div>
 
@@ -149,10 +174,22 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </h4>
             <div className={`overflow-hidden transition-all duration-300 ease-in-out ${openSections['follow'] ? 'max-h-[300px] opacity-100 mb-4' : 'max-h-0 opacity-0 lg:max-h-full lg:opacity-100 lg:mb-0'}`}>
               <div className="flex space-x-3 mb-8">
-                <a href="#" className="w-10 h-10 bg-black flex items-center justify-center hover:bg-[#EE6348] transition rounded-sm">
+                <a
+                  href="https://www.facebook.com/theveenacollections"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook"
+                  className="w-10 h-10 bg-black flex items-center justify-center hover:bg-[#EE6348] transition rounded-sm"
+                >
                   <Facebook size={18} />
                 </a>
-                <a href="#" className="w-10 h-10 bg-black flex items-center justify-center hover:bg-[#EE6348] transition rounded-sm">
+                <a
+                  href="https://www.instagram.com/theveenacollections/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Instagram"
+                  className="w-10 h-10 bg-black flex items-center justify-center hover:bg-[#EE6348] transition rounded-sm"
+                >
                   <Instagram size={18} />
                 </a>
               </div>

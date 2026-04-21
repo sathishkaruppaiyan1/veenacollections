@@ -12,7 +12,7 @@ import { CookiePolicy } from './components/CookiePolicy';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { api } from './api';
 import { Product, ViewState, CartItem, Category, NavItem, Variation, Order, HomeHeroBanner, HomeReel } from './types';
-import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, UserCircle2, Package, MapPin, LogOut, CreditCard, Quote, Tag, Truck, Phone, Mail, Play } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, UserCircle2, Package, MapPin, LogOut, CreditCard, Quote, Tag, Truck, Phone, Mail, Play, Facebook, Instagram } from 'lucide-react';
 
 const DEFAULT_LOGO = "https://admin.theveenacollections.com/wp-content/uploads/2025/11/Blue-White-Modern-Minimalist-Name-Logo-2.png";
 
@@ -75,8 +75,8 @@ const DealOfTheDay = ({ onNavigate, onProductClick, onAddToCart, onToggleWishlis
     return () => clearInterval(interval);
   }, [saleEndDate]);
 
-  // Don't render if no deal products or deal expired
-  if (!loading && (dealProducts.length === 0 || dealExpired)) {
+  // Don't render if no deal products
+  if (!loading && dealProducts.length === 0) {
     return null;
   }
 
@@ -95,24 +95,26 @@ const DealOfTheDay = ({ onNavigate, onProductClick, onAddToCart, onToggleWishlis
               Shop The Deal
             </button>
           </div>
-          <div className="lg:w-1/2 flex justify-center gap-3 md:gap-6">
-            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
-              <span className="text-3xl md:text-4xl font-bold">{timeLeft.days}</span>
-              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Days</span>
+          {saleEndDate && (
+            <div className="lg:w-1/2 flex justify-center gap-3 md:gap-6">
+              <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+                <span className="text-3xl md:text-4xl font-bold">{timeLeft.days}</span>
+                <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Days</span>
+              </div>
+              <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+                <span className="text-3xl md:text-4xl font-bold">{timeLeft.hours}</span>
+                <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Hours</span>
+              </div>
+              <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+                <span className="text-3xl md:text-4xl font-bold">{timeLeft.minutes}</span>
+                <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Mins</span>
+              </div>
+              <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+                <span className="text-3xl md:text-4xl font-bold">{timeLeft.seconds}</span>
+                <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Secs</span>
+              </div>
             </div>
-            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
-              <span className="text-3xl md:text-4xl font-bold">{timeLeft.hours}</span>
-              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Hours</span>
-            </div>
-            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
-              <span className="text-3xl md:text-4xl font-bold">{timeLeft.minutes}</span>
-              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Mins</span>
-            </div>
-            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
-              <span className="text-3xl md:text-4xl font-bold">{timeLeft.seconds}</span>
-              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Secs</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Products Grid Below Timer */}
@@ -121,17 +123,22 @@ const DealOfTheDay = ({ onNavigate, onProductClick, onAddToCart, onToggleWishlis
             <Loader2 className="animate-spin text-[#0b141b]" size={32} />
           </div>
         ) : dealProducts.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-8 border-t border-white/20">
+          <div className={`gap-6 pt-8 border-t border-white/20 ${
+            dealProducts.length === 1 ? 'flex justify-center' :
+            dealProducts.length === 2 ? 'grid grid-cols-1 sm:flex sm:justify-center sm:gap-8 lg:gap-12' :
+            'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+          }`}>
             {dealProducts.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onClick={onProductClick}
-                onAddToCart={onAddToCart}
-                onToggleWishlist={onToggleWishlist}
-                onQuickView={onQuickView}
-                isWishlisted={isInWishlist(product.id)}
-              />
+              <div key={product.id} className={dealProducts.length <= 2 ? 'w-full sm:max-w-[320px] lg:max-w-[350px]' : ''}>
+                <ProductCard
+                  product={product}
+                  onClick={onProductClick}
+                  onAddToCart={onAddToCart}
+                  onToggleWishlist={onToggleWishlist}
+                  onQuickView={onQuickView}
+                  isWishlisted={isInWishlist(product.id)}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -309,8 +316,21 @@ const CustomerReviews = () => {
   );
 };
 
+// Read initial route state from the URL so a page refresh lands on the same view.
+const getInitialUrlState = () => {
+  if (typeof window === 'undefined') return { view: 'home' as ViewState, param: '', productId: 0 };
+  const params = new URLSearchParams(window.location.search);
+  const rawView = params.get('view');
+  const validViews: ViewState[] = ['home','shop','product','cart','wishlist','register','account','page','checkout','track-order','categories','deal','rent','cookie-policy','thank-you'];
+  const view: ViewState = (rawView && (validViews as string[]).includes(rawView)) ? (rawView as ViewState) : 'home';
+  const param = params.get('param') || '';
+  const productId = parseInt(params.get('id') || '0', 10) || 0;
+  return { view, param, productId };
+};
+
 const App: React.FC = () => {
-  const [view, setView] = useState<ViewState>('home');
+  const initialUrl = getInitialUrlState();
+  const [view, setView] = useState<ViewState>(initialUrl.view);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [selectedProductImage, setSelectedProductImage] = useState<string | null>(null);
   const [productQuantity, setProductQuantity] = useState(1);
@@ -331,10 +351,18 @@ const App: React.FC = () => {
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
-  // Navigation State
-  const [accountTab, setAccountTab] = useState<'dashboard' | 'orders' | 'addresses' | 'details'>('dashboard');
-  const [currentPageSlug, setCurrentPageSlug] = useState<string>('');
-  const [currentCategory, setCurrentCategory] = useState<string>('');
+  // Navigation State (initialized from URL for hard-refresh persistence)
+  const [accountTab, setAccountTab] = useState<'dashboard' | 'orders' | 'addresses' | 'details'>(
+    initialUrl.view === 'account' && ['dashboard', 'orders', 'addresses', 'details'].includes(initialUrl.param)
+      ? (initialUrl.param as any)
+      : 'dashboard'
+  );
+  const [currentPageSlug, setCurrentPageSlug] = useState<string>(
+    initialUrl.view === 'page' ? initialUrl.param : ''
+  );
+  const [currentCategory, setCurrentCategory] = useState<string>(
+    initialUrl.view === 'shop' ? initialUrl.param : ''
+  );
 
   // Filter States
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
@@ -345,6 +373,7 @@ const App: React.FC = () => {
 
   // Dynamic Data States
   const [products, setProducts] = useState<Product[]>([]);
+  const [bestSellerProducts, setBestSellerProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<NavItem[]>([]);
   const [siteInfo, setSiteInfo] = useState({ name: 'VEENA COLLECTIONS', description: 'Traditional & Modern' });
@@ -365,8 +394,9 @@ const App: React.FC = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [fetchedProducts, fetchedCategories, fetchedMenu, fetchedInfo, fetchedLogo, fetchedAttrs] = await Promise.all([
+        const [fetchedProducts, fetchedBestSellers, fetchedCategories, fetchedMenu, fetchedInfo, fetchedLogo, fetchedAttrs] = await Promise.all([
           api.getProducts(),
+          api.getBestSellerProducts(),
           api.getCategories(),
           api.getMenu(),
           api.getSiteInfo(),
@@ -374,6 +404,7 @@ const App: React.FC = () => {
           api.getAttributes()
         ]);
         setProducts(fetchedProducts);
+        setBestSellerProducts(fetchedBestSellers);
         setCategories(fetchedCategories);
         setMenuItems(fetchedMenu);
         setSiteInfo(fetchedInfo);
@@ -394,6 +425,27 @@ const App: React.FC = () => {
     };
     loadData();
   }, []);
+
+  // On first mount, seed history.state so back/forward works after a hard refresh.
+  useEffect(() => {
+    if (window.history.state == null) {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get('view') || 'home';
+      const p = params.get('param') || undefined;
+      const id = parseInt(params.get('id') || '0', 10) || undefined;
+      window.history.replaceState({ view: v, param: p, productId: id }, '', window.location.search || '');
+    }
+  }, []);
+
+  // If the URL points to a product on refresh, look it up once products load.
+  useEffect(() => {
+    if (initialUrl.view !== 'product' || !initialUrl.productId) return;
+    if (products.length === 0) return;
+    const prod = products.find(p => p.id === initialUrl.productId);
+    if (prod && activeProduct?.id !== prod.id) {
+      setActiveProduct(prod);
+    }
+  }, [products]);
 
   // Handle Browser Back Button
   useEffect(() => {
@@ -486,14 +538,12 @@ const App: React.FC = () => {
   // Resolve the max purchasable qty.
   // Priority: variation stock > product stock > unlimited (null)
   const resolveMaxQty = (product: Product, variation?: Variation | null): number | null => {
-    console.log('resolveMaxQty called:', {
-      productId: product.id,
-      productManageStock: product.manage_stock,
-      productStockQty: product.stock_quantity,
-      variationId: variation?.id,
-      variationManageStock: variation?.manage_stock,
-      variationStockQty: variation?.stock_quantity,
-    });
+    // Check variation stock status first if set explicitly to out of stock
+    if (variation && variation.stock_status === 'outofstock') return 0;
+    
+    // Check product stock status
+    if (product.stock_status === 'outofstock') return 0;
+
     if (variation && variation.manage_stock && variation.stock_quantity != null) {
       return variation.stock_quantity;
     }
@@ -788,6 +838,21 @@ const App: React.FC = () => {
         });
 
         console.log("Order created:", order);
+
+        // REAL-TIME STOCK UPDATE: Decrement local stock immediately after purchase
+        setProducts(prevProducts => {
+          return prevProducts.map(mainProduct => {
+            const purchasedItem = cart.find(ci => ci.id === mainProduct.id);
+            if (purchasedItem && mainProduct.manage_stock && mainProduct.stock_quantity != null) {
+              return {
+                ...mainProduct,
+                stock_quantity: Math.max(0, mainProduct.stock_quantity - purchasedItem.quantity),
+                stock_status: (mainProduct.stock_quantity - purchasedItem.quantity) <= 0 ? 'outofstock' : mainProduct.stock_status
+              };
+            }
+            return mainProduct;
+          });
+        });
 
         setLastOrderId(order.id.toString());
         setCart([]);
@@ -1315,13 +1380,136 @@ const App: React.FC = () => {
 
     return (
       <div className="container mx-auto px-4 py-12">
+        <style dangerouslySetInnerHTML={{__html: `
+          .custom-wp-page form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 1.5rem;
+            max-width: 600px;
+          }
+          .custom-wp-page input[type="text"],
+          .custom-wp-page input[type="email"],
+          .custom-wp-page input[type="tel"],
+          .custom-wp-page input[type="number"],
+          .custom-wp-page textarea,
+          .custom-wp-page select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            background-color: #f9fafb;
+            color: #374151;
+            font-family: inherit;
+          }
+          .custom-wp-page input:focus,
+          .custom-wp-page textarea:focus,
+          .custom-wp-page select:focus {
+            outline: none;
+            border-color: #EE6348;
+            box-shadow: 0 0 0 3px rgba(238, 99, 72, 0.15);
+            background-color: #ffffff;
+          }
+          .custom-wp-page textarea {
+            min-height: 150px;
+            resize: vertical;
+          }
+          .custom-wp-page input[type="submit"],
+          .custom-wp-page button[type="submit"],
+          .custom-wp-page .wpcf7-submit,
+          .custom-wp-page .wpforms-submit {
+            background-color: #EE6348;
+            color: white;
+            padding: 14px 36px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: fit-content;
+            box-shadow: 0 4px 6px rgba(238, 99, 72, 0.2);
+            margin-top: 12px;
+          }
+          .custom-wp-page input[type="submit"]:hover,
+          .custom-wp-page button[type="submit"]:hover,
+          .custom-wp-page .wpcf7-submit:hover,
+          .custom-wp-page .wpforms-submit:hover {
+            background-color: #0b141b;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+          }
+          .custom-wp-page label {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 8px;
+            display: inline-block;
+            font-size: 14px;
+          }
+          .custom-wp-page .wpcf7-form-control-wrap {
+            display: block;
+            margin-top: 4px;
+          }
+          .custom-wp-page .has-spinner {
+            display: none !important;
+          }
+        `}} />
         {loadingPage ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#EE6348]" size={40} /></div>
         ) : pageData ? (
-          <div className="max-w-4xl mx-auto bg-white p-8 border border-gray-100 shadow-sm">
-            <h1 className="text-3xl font-bold uppercase font-heading text-gray-800 mb-8 pb-4 border-b border-[#EE6348] inline-block">{pageData.title}</h1>
-            <div className="prose prose-sm md:prose-base max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: pageData.content }} />
-          </div>
+          currentPageSlug === 'contact' ? (
+            <div className="max-w-6xl mx-auto bg-white p-8 md:p-12 border border-gray-100 shadow-xl rounded-xl">
+              <h1 className="text-3xl md:text-4xl font-bold uppercase font-heading text-gray-800 mb-8 pb-4 border-b-2 border-[#EE6348] inline-block tracking-wide">{pageData.title}</h1>
+              <div className="flex flex-col lg:flex-row gap-12">
+                <div className="w-full lg:w-[60%]">
+                  <div className="prose prose-sm md:prose-base max-w-none text-gray-600 custom-wp-page leading-relaxed" dangerouslySetInnerHTML={{ __html: pageData.content }} />
+                </div>
+                <div className="w-full lg:w-[40%] bg-gray-50 p-8 md:p-10 rounded-xl border border-gray-100 h-fit">
+                  <div className="mb-10">
+                    <h4 className="font-bold text-lg md:text-xl mb-6 flex items-center text-gray-800 uppercase tracking-widest font-heading">
+                      <span className="text-[#EE6348] mr-3">›</span> Customer Service
+                    </h4>
+                    <ul className="space-y-4 text-gray-600 font-medium">
+                      <li className="flex items-center">
+                        <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center mr-4 flex-shrink-0">
+                          <Mail className="text-[#EE6348]" size={18} />
+                        </div>
+                        <a href="mailto:theveenacollections@gmail.com" className="hover:text-[#EE6348] transition break-all">theveenacollections@gmail.com</a>
+                      </li>
+                      <li className="flex items-center">
+                        <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center mr-4 flex-shrink-0">
+                          <Phone className="text-[#EE6348]" size={18} />
+                        </div>
+                        <a href="https://wa.me/19099132080" target="_blank" rel="noopener noreferrer" className="hover:text-[#EE6348] transition">Whatsapp: (909) 913-2080 only</a>
+                      </li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-bold text-lg md:text-xl mb-6 flex items-center text-gray-800 uppercase tracking-widest font-heading">
+                      <span className="text-[#EE6348] mr-3">›</span> Follow Us
+                    </h4>
+                    <div className="flex space-x-4">
+                      <a href="#" className="w-12 h-12 bg-black flex items-center justify-center text-white hover:bg-[#EE6348] transition rounded-full shadow-md hover:-translate-y-1">
+                        <Facebook size={20} />
+                      </a>
+                      <a href="#" className="w-12 h-12 bg-black flex items-center justify-center text-white hover:bg-[#EE6348] transition rounded-full shadow-md hover:-translate-y-1">
+                        <Instagram size={20} />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-4xl mx-auto bg-white p-8 md:p-12 border border-gray-100 shadow-xl rounded-xl">
+              <h1 className="text-3xl md:text-4xl font-bold uppercase font-heading text-gray-800 mb-8 pb-4 border-b-2 border-[#EE6348] inline-block tracking-wide">{pageData.title}</h1>
+              <div className="prose prose-sm md:prose-base max-w-none text-gray-600 custom-wp-page leading-relaxed" dangerouslySetInnerHTML={{ __html: pageData.content }} />
+            </div>
+          )
         ) : (
           <div className="text-center py-12">
             <h2 className="text-xl font-bold text-gray-800">Page Not Found</h2>
@@ -1682,13 +1870,13 @@ const App: React.FC = () => {
         />
 
         {/* Categories Grid */}
-        <div className="container mx-auto px-4 mb-16">
+        <div className="container mx-auto px-4 mb-16 pt-12">
           <div className="text-center mb-10">
             <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Categories</h3>
             <div className="w-12 h-0.5 bg-[#EE6348] mx-auto mt-4"></div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {categories.map(cat => (
+            {categories.filter(c => !c.parent).map(cat => (
               <div key={cat.id} className="relative group overflow-hidden cursor-pointer aspect-square" onClick={() => handleNavigate('shop', cat.name)}>
                 {/* Image */}
                 <img
@@ -1704,8 +1892,8 @@ const App: React.FC = () => {
                 <div className="absolute inset-0 bg-white/30 opacity-0 group-hover:opacity-100 transform scale-50 group-hover:scale-100 transition-all duration-500 ease-out pointer-events-none"></div>
 
                 {/* Title Slide Up Animation - Visible on mobile, hover effect on desktop */}
-                <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-100 lg:opacity-0 lg:-translate-y-[40%] lg:group-hover:opacity-100 lg:group-hover:-translate-y-1/2 transition-all duration-300 ease-out z-10 w-full flex justify-center pointer-events-none">
-                  <div className="bg-[#EE6348] text-white font-bold uppercase py-2 px-1 min-w-[200px] text-center shadow-lg hover:bg-[#EE6348] transition-colors pointer-events-auto">
+                <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-100 lg:opacity-0 lg:-translate-y-[40%] lg:group-hover:opacity-100 lg:group-hover:-translate-y-1/2 transition-all duration-300 ease-out z-10 w-full px-2 flex justify-center pointer-events-none">
+                  <div className="bg-[#EE6348] text-white font-bold uppercase py-2 px-2 w-full max-w-[90%] md:w-auto md:min-w-[180px] text-center shadow-lg hover:bg-[#EE6348] transition-colors pointer-events-auto text-[10px] sm:text-xs md:text-sm leading-tight line-clamp-2">
                     {cat.name}
                   </div>
                 </div>
@@ -1715,62 +1903,62 @@ const App: React.FC = () => {
         </div>
 
         {/* Best Sellers */}
-        <div className="bg-[#B8A99A] py-16 mb-16">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-10">
-              <h3 className="text-xl font-bold uppercase tracking-widest text-black">Best Sellers</h3>
-              <div className="w-12 h-0.5 bg-[#EE6348] mx-auto mt-4"></div>
-            </div>
+        {bestSellerProducts.length > 0 && (
+          <div className="bg-[#B8A99A] py-16 mb-16">
+            <div className="container mx-auto px-4">
+              <div className="text-center mb-10">
+                <h3 className="text-xl font-bold uppercase tracking-widest text-black">Best Sellers</h3>
+                <div className="w-12 h-0.5 bg-[#EE6348] mx-auto mt-4"></div>
+              </div>
 
-            <div className="relative">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {products.slice(0, 4).map(product => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    onClick={handleProductClick}
-                    onAddToCart={addToCart}
-                    onToggleWishlist={toggleWishlist}
-                    onQuickView={handleQuickView}
-                    isWishlisted={isInWishlist(product.id)}
-                  />
-                ))}
+              <div className="relative">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {bestSellerProducts.map(product => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onClick={handleProductClick}
+                      onAddToCart={addToCart}
+                      onToggleWishlist={toggleWishlist}
+                      onQuickView={handleQuickView}
+                      isWishlisted={isInWishlist(product.id)}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Shop by Reels */}
         <div className="container mx-auto px-4 mb-16">
-          <div className="flex items-end justify-between gap-4 mb-8">
-            <div>
-              <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Shop by Reels</h3>
-              <div className="w-12 h-0.5 bg-[#EE6348] mt-4"></div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => scrollReels('left')}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition hover:border-[#EE6348] hover:bg-[#EE6348] hover:text-white"
-                aria-label="Scroll reels left"
-              >
-                <ArrowLeft size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollReels('right')}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition hover:border-[#EE6348] hover:bg-[#EE6348] hover:text-white"
-                aria-label="Scroll reels right"
-              >
-                <ArrowRight size={16} />
-              </button>
-              <button
-                onClick={() => handleNavigate('shop')}
-                className="text-sm font-bold uppercase tracking-wider text-[#EE6348] hover:text-black transition"
-              >
-                View All
-              </button>
-            </div>
+          <div className="text-center mb-6">
+            <h3 className="text-xl font-bold uppercase tracking-widest text-gray-800">Shop by Reels</h3>
+            <div className="w-12 h-0.5 bg-[#EE6348] mx-auto mt-4"></div>
+          </div>
+          <div className="flex items-center justify-end gap-3 mb-6">
+            <button
+              type="button"
+              onClick={() => scrollReels('left')}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition hover:border-[#EE6348] hover:bg-[#EE6348] hover:text-white"
+              aria-label="Scroll reels left"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollReels('right')}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition hover:border-[#EE6348] hover:bg-[#EE6348] hover:text-white"
+              aria-label="Scroll reels right"
+            >
+              <ArrowRight size={16} />
+            </button>
+            <button
+              onClick={() => handleNavigate('shop')}
+              className="text-sm font-bold uppercase tracking-wider text-[#EE6348] hover:text-black transition"
+            >
+              View All
+            </button>
           </div>
 
           <div
@@ -1887,13 +2075,60 @@ const App: React.FC = () => {
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const filteredLengthRef = useRef(0);
 
-    // Get products for current category (before applying price/attribute filters)
+    // Resolve the currently-selected category object and its descendant IDs so we
+    // can include products that belong to any subcategory of the selected one.
+    const activeCategoryInfo = useMemo(() => {
+      if (!currentCategory) return { current: null as Category | null, descendantNames: new Set<string>() };
+      const current = categories.find(c => c.name.toLowerCase() === currentCategory.toLowerCase()) || null;
+      if (!current) return { current: null, descendantNames: new Set<string>() };
+      // Collect current + all descendants by walking the parent tree.
+      const descendants = new Set<number>([current.id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        categories.forEach(c => {
+          if (c.parent && descendants.has(c.parent) && !descendants.has(c.id)) {
+            descendants.add(c.id);
+            changed = true;
+          }
+        });
+      }
+      const descendantNames = new Set(
+        categories.filter(c => descendants.has(c.id)).map(c => c.name.toLowerCase())
+      );
+      return { current, descendantNames };
+    }, [categories, currentCategory]);
+
+    // Get products for current category (before applying price/attribute filters).
+    // A product is shown if ANY of its assigned categories matches the current
+    // category or any of its descendants — this is what makes subcategory pages
+    // work when a product is only tagged to the subcategory (e.g. "Silk Saree")
+    // and the parent ("Saree") displays it too.
     const categoryProducts = useMemo(() => {
       return products.filter(p => {
-        if (currentCategory && p.category.toLowerCase() !== currentCategory.toLowerCase()) return false;
-        return true;
+        if (!currentCategory) return true;
+        const productCats = (p.categories && p.categories.length > 0 ? p.categories : [p.category])
+          .map(n => n.toLowerCase());
+        const names = activeCategoryInfo.descendantNames;
+        if (names.size === 0) {
+          return productCats.includes(currentCategory.toLowerCase());
+        }
+        return productCats.some(pc => names.has(pc));
       });
-    }, [products, currentCategory]);
+    }, [products, currentCategory, activeCategoryInfo]);
+
+    // Direct subcategories of the current category (used for the in-page grid).
+    const subcategories = useMemo(() => {
+      if (!activeCategoryInfo.current) return [] as Category[];
+      return categories.filter(c => c.parent === activeCategoryInfo.current!.id);
+    }, [categories, activeCategoryInfo]);
+
+    // Categories shown in the filter sidebar: direct subcategories of the current
+    // category, or top-level categories when the shop page has no category selected.
+    const filterCategories = useMemo(() => {
+      if (subcategories.length > 0) return subcategories;
+      return categories.filter(c => !c.parent);
+    }, [categories, subcategories]);
 
     // Calculate dynamic price range from category products
     const availablePriceRange = useMemo(() => {
@@ -1934,6 +2169,23 @@ const App: React.FC = () => {
         }))
         .filter(attr => attr.terms.length > 0);
     }, [categoryProducts, productAttributes]);
+
+    // When the category changes, snap the price slider to the new category's
+    // price range and clear attribute selections that may not apply anymore.
+    // Use functional updaters so we return the same reference when nothing
+    // actually changed — otherwise we'd schedule an unnecessary re-render
+    // every mount (ShopView is redefined inside App), which closes the
+    // filter sidebar as soon as the user opens it.
+    useEffect(() => {
+      setPriceRange(prev =>
+        prev[0] === availablePriceRange.min && prev[1] === availablePriceRange.max
+          ? prev
+          : [availablePriceRange.min, availablePriceRange.max]
+      );
+      setSelectedFilterAttributes(prev =>
+        Object.keys(prev).length === 0 ? prev : {}
+      );
+    }, [currentCategory, availablePriceRange.min, availablePriceRange.max]);
 
     const filteredProducts = useMemo(() => {
       return categoryProducts
@@ -2012,7 +2264,7 @@ const App: React.FC = () => {
 
         {/* Filters and Sort in one line */}
         <FilterBar
-          categories={categories}
+          categories={filterCategories}
           onCategoryClick={(cat) => handleNavigate('shop', cat)}
           priceRange={priceRange}
           setPriceRange={setPriceRange}
@@ -2047,6 +2299,35 @@ const App: React.FC = () => {
         />
 
         <div className="flex-1">
+          {/* Subcategory cards (shown when the current category has children) */}
+          {subcategories.length > 0 && (
+            <div className="mb-10">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-700 mb-4">Shop by Subcategory</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {subcategories.map(sub => (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => handleNavigate('shop', sub.name)}
+                    className="group relative overflow-hidden aspect-square border border-gray-200 bg-white hover:border-[#EE6348] transition"
+                  >
+                    <img
+                      src={sub.image}
+                      alt={sub.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(sub.name)}&background=B8A99A&color=fff&size=400&bold=true`;
+                      }}
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-left">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-white">{sub.name}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Product Grid - Full Width */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
             {filteredProducts.slice(0, displayCount).map(product => (
@@ -2102,7 +2383,7 @@ const App: React.FC = () => {
         <div className="flex items-center text-xs text-gray-500 mb-8">
           <Home size={12} className="mr-1" cursor="pointer" onClick={() => handleNavigate('home')} />
           <span className="mx-1">/</span>
-          <span className="cursor-pointer hover:text-[#EE6348]" onClick={() => handleNavigate('shop')}>{activeProduct.category}</span>
+          <span className="cursor-pointer hover:text-[#EE6348]" onClick={() => handleNavigate('shop', activeProduct.category)}>{activeProduct.category}</span>
           <span className="mx-1">/</span>
           <span className="font-bold text-gray-700">{activeProduct.name}</span>
         </div>
@@ -2187,43 +2468,63 @@ const App: React.FC = () => {
               ) : null;
             })()}
 
-            <div className="flex items-center space-x-4 mb-8">
-              {(() => { const maxStock = resolveMaxQty(activeProduct, currentVariation); const atMax = maxStock !== null && productQuantity >= maxStock; return (
-              <div className="inline-flex items-center bg-gray-50 rounded-full border border-gray-200">
-                <button
-                  onClick={() => setProductQuantity(prev => Math.max(1, prev - 1))}
-                  disabled={productQuantity <= 1}
-                  className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 ${productQuantity <= 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-[#EE6348] hover:text-white'}`}
-                >
-                  <Minus size={16} strokeWidth={2.5} />
-                </button>
-                <span className="w-12 text-center text-base font-bold text-gray-800 select-none">{productQuantity}</span>
-                <button
-                  onClick={() => setProductQuantity(prev => {
-                    if (maxStock !== null && prev >= maxStock) {
-                      showToast(`Only ${maxStock} available in stock`);
-                      return maxStock;
-                    }
-                    return prev + 1;
-                  })}
-                  disabled={atMax}
-                  className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 ${atMax ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-[#EE6348] hover:text-white'}`}
-                >
-                  <Plus size={16} strokeWidth={2.5} />
-                </button>
-              </div>
-              ); })()}
-              <button
-                onClick={() => {
-                  addToCart(activeProduct, { quantity: productQuantity });
-                  setProductQuantity(1); // Reset to 1 after adding
-                }}
-                className={`text-white px-8 py-2.5 font-bold uppercase text-sm transition flex items-center ${(activeProduct.type === 'variable' && !currentVariation) ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#EE6348] hover:bg-black'
-                  }`}
-              >
-                <ShoppingCart size={16} className="mr-2" /> Add to cart
-              </button>
-            </div>
+            {(() => {
+              const maxStock = resolveMaxQty(activeProduct, currentVariation);
+              const isOutOfStock = maxStock !== null && maxStock <= 0;
+              
+              if (isOutOfStock) {
+                return (
+                  <div className="mb-8">
+                    <button 
+                      disabled 
+                      className="bg-gray-400 text-white px-10 py-3 font-bold uppercase text-sm cursor-not-allowed flex items-center shadow-md"
+                    >
+                      <X size={18} className="mr-2" /> Out of Stock
+                    </button>
+                  </div>
+                );
+              }
+
+              const atMax = maxStock !== null && productQuantity >= maxStock;
+              
+              return (
+                <div className="flex items-center space-x-4 mb-8">
+                  <div className="inline-flex items-center bg-gray-50 rounded-full border border-gray-200">
+                    <button
+                      onClick={() => setProductQuantity(prev => Math.max(1, prev - 1))}
+                      disabled={productQuantity <= 1}
+                      className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 ${productQuantity <= 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-[#EE6348] hover:text-white'}`}
+                    >
+                      <Minus size={16} strokeWidth={2.5} />
+                    </button>
+                    <span className="w-12 text-center text-base font-bold text-gray-800 select-none">{productQuantity}</span>
+                    <button
+                      onClick={() => setProductQuantity(prev => {
+                        if (maxStock !== null && prev >= maxStock) {
+                          showToast(`Only ${maxStock} available in stock`);
+                          return maxStock;
+                        }
+                        return prev + 1;
+                      })}
+                      disabled={atMax}
+                      className={`w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 ${atMax ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-[#EE6348] hover:text-white'}`}
+                    >
+                      <Plus size={16} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => {
+                      addToCart(activeProduct, { quantity: productQuantity });
+                      setProductQuantity(1); // Reset to 1 after adding
+                    }}
+                    className={`text-white px-8 py-2.5 font-bold uppercase text-sm transition flex items-center ${(activeProduct.type === 'variable' && !currentVariation) ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#EE6348] hover:bg-black'
+                      }`}
+                  >
+                    <ShoppingCart size={16} className="mr-2" /> Add to cart
+                  </button>
+                </div>
+              );
+            })()}
 
             <div className="flex space-x-2">
               <button
@@ -2470,6 +2771,11 @@ const App: React.FC = () => {
     const [loginEmail, setLoginEmail] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
     const [registerEmail, setRegisterEmail] = useState('');
+    const [regFirstName, setRegFirstName] = useState('');
+    const [regLastName, setRegLastName] = useState('');
+    const [regAddress, setRegAddress] = useState('');
+    const [regCity, setRegCity] = useState('');
+    const [regPostcode, setRegPostcode] = useState('');
     const [isRegistering, setIsRegistering] = useState(false);
 
     const handleLogin = (e: React.FormEvent) => {
@@ -2483,19 +2789,51 @@ const App: React.FC = () => {
       handleNavigate('account', 'dashboard');
     };
 
-    const handleRegister = (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsRegistering(true);
-      setTimeout(() => {
+      try {
+        const customerData = {
+          email: registerEmail,
+          first_name: regFirstName,
+          last_name: regLastName,
+          billing: {
+            first_name: regFirstName,
+            last_name: regLastName,
+            address_1: regAddress,
+            city: regCity,
+            state: '',
+            postcode: regPostcode,
+            country: 'IN', // Default to India or detect
+            email: registerEmail
+          }
+        };
+        
+        await api.registerCustomer(customerData);
+        
+        setToast({ message: "Registration successful! A link to set your password has been sent to your email.", visible: true });
+        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 6000);
+        
+        // Clear form
+        setRegisterEmail('');
+        setRegFirstName('');
+        setRegLastName('');
+        setRegAddress('');
+        setRegCity('');
+        setRegPostcode('');
+        
+        // Optionally scroll to top to show login form
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (err: any) {
+        let errorMsg = err.message || "Registration failed. Please try again.";
+        if (err.code === 'registration-error-email-exists') {
+          errorMsg = "This email is already registered. Please log in using the form on the left!";
+        }
+        setToast({ message: errorMsg, visible: true });
+        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 5000);
+      } finally {
         setIsRegistering(false);
-        const userData = { email: registerEmail, name: registerEmail.split('@')[0] || 'User' };
-        setUser(userData);
-        setIsLoggedIn(true);
-        localStorage.setItem('veena_user', JSON.stringify(userData));
-        setToast({ message: "Registration successful! Please check your email.", visible: true });
-        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
-        handleNavigate('account', 'dashboard');
-      }, 1500);
+      }
     };
 
     const handleGoogleSuccess = (credentialResponse: { credential?: string }) => {
@@ -2618,6 +2956,29 @@ const App: React.FC = () => {
             )}
 
             <form onSubmit={handleRegister} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">First Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={regFirstName}
+                    onChange={(e) => setRegFirstName(e.target.value)}
+                    className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348] transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Last Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={regLastName}
+                    onChange={(e) => setRegLastName(e.target.value)}
+                    className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348] transition"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Email address *</label>
                 <input
@@ -2629,21 +2990,53 @@ const App: React.FC = () => {
                 />
               </div>
 
-              <div className="text-sm text-gray-600 space-y-4">
-                <p>A link to set a new password will be sent to your email address.</p>
-                <p>
-                  Your personal data will be used to support your experience throughout this website, to manage access to your account, and for other purposes described in our
-                  <a href="#" className="text-[#EE6348] font-bold ml-1 hover:underline">privacy policy</a>.
-                </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Street Address *</label>
+                  <input
+                    type="text"
+                    required
+                    value={regAddress}
+                    onChange={(e) => setRegAddress(e.target.value)}
+                    className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348] transition"
+                    placeholder="House number and street name"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Town / City *</label>
+                    <input
+                      type="text"
+                      required
+                      value={regCity}
+                      onChange={(e) => setRegCity(e.target.value)}
+                      className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348] transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Postcode / ZIP *</label>
+                    <input
+                      type="text"
+                      required
+                      value={regPostcode}
+                      onChange={(e) => setRegPostcode(e.target.value)}
+                      className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[#EE6348] transition"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <button
-                type="submit"
+              <button 
+                type="submit" 
                 disabled={isRegistering}
                 className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 hover:bg-black transition text-sm w-full flex items-center justify-center disabled:opacity-50"
               >
-                {isRegistering ? <Loader2 className="animate-spin mr-2" size={16} /> : 'Register'}
+                {isRegistering ? <Loader2 className="animate-spin mr-2" size={18} /> : 'Register'}
               </button>
+              
+              <div className="mt-4 text-center md:hidden">
+                <p className="text-sm">Already have an account? <button type="button" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="text-[#EE6348] font-bold">Login here</button></p>
+              </div>
             </form>
           </div>
         </div>
@@ -2692,6 +3085,8 @@ const App: React.FC = () => {
       fetchDeals();
     }, []);
 
+    const [dealExpired, setDealExpired] = useState(false);
+
     useEffect(() => {
       if (!saleEndDate) return;
       const targetDate = new Date(saleEndDate);
@@ -2705,7 +3100,9 @@ const App: React.FC = () => {
             minutes: Math.floor((difference / 1000 / 60) % 60),
             seconds: Math.floor((difference / 1000) % 60)
           });
+          setDealExpired(false);
         } else {
+          setDealExpired(true);
           clearInterval(interval);
         }
       }, 1000);
@@ -2719,24 +3116,26 @@ const App: React.FC = () => {
           <p className="text-gray-500 mt-2 text-sm uppercase tracking-widest">Limited time offers on premium collection</p>
 
           {/* Timer */}
-          <div className="flex justify-center gap-3 md:gap-6 mt-8">
-            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
-              <span className="text-3xl md:text-4xl font-bold">{timeLeft.days}</span>
-              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Days</span>
+          {saleEndDate && (
+            <div className="flex justify-center gap-3 md:gap-6 mt-8">
+              <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+                <span className="text-3xl md:text-4xl font-bold">{timeLeft.days}</span>
+                <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Days</span>
+              </div>
+              <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+                <span className="text-3xl md:text-4xl font-bold">{timeLeft.hours}</span>
+                <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Hours</span>
+              </div>
+              <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+                <span className="text-3xl md:text-4xl font-bold">{timeLeft.minutes}</span>
+                <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Mins</span>
+              </div>
+              <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
+                <span className="text-3xl md:text-4xl font-bold">{timeLeft.seconds}</span>
+                <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Secs</span>
+              </div>
             </div>
-            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
-              <span className="text-3xl md:text-4xl font-bold">{timeLeft.hours}</span>
-              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Hours</span>
-            </div>
-            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
-              <span className="text-3xl md:text-4xl font-bold">{timeLeft.minutes}</span>
-              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Mins</span>
-            </div>
-            <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-4 rounded-lg w-20 md:w-28 border border-[#0b141b]/15">
-              <span className="text-3xl md:text-4xl font-bold">{timeLeft.seconds}</span>
-              <span className="text-[10px] md:text-xs uppercase tracking-wider mt-1 font-bold">Secs</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {loading ? (
@@ -2744,17 +3143,22 @@ const App: React.FC = () => {
             <Loader2 className="animate-spin text-[#EE6348]" size={40} />
           </div>
         ) : dealProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className={`gap-6 ${
+            dealProducts.length === 1 ? 'flex justify-center' :
+            dealProducts.length === 2 ? 'grid grid-cols-1 sm:flex sm:justify-center sm:gap-8 lg:gap-12' :
+            'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+          }`}>
             {dealProducts.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onClick={handleProductClick}
-                onAddToCart={addToCart}
-                onToggleWishlist={toggleWishlist}
-                onQuickView={handleQuickView}
-                isWishlisted={isInWishlist(product.id)}
-              />
+              <div key={product.id} className={dealProducts.length <= 2 ? 'w-full sm:max-w-[320px] lg:max-w-[350px]' : ''}>
+                <ProductCard
+                  product={product}
+                  onClick={handleProductClick}
+                  onAddToCart={addToCart}
+                  onToggleWishlist={toggleWishlist}
+                  onQuickView={handleQuickView}
+                  isWishlisted={isInWishlist(product.id)}
+                />
+              </div>
             ))}
           </div>
         ) : (
@@ -2816,7 +3220,7 @@ const App: React.FC = () => {
     <div className="container mx-auto px-4 py-12">
       <h1 className="text-2xl font-bold uppercase font-heading text-gray-800 mb-8 border-b pb-4">All Categories</h1>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {categories.map(cat => (
+        {categories.filter(c => !c.parent).map(cat => (
           <div key={cat.id} className="group cursor-pointer" onClick={() => handleNavigate('shop', cat.name)}>
             <div className="relative overflow-hidden aspect-square mb-3 bg-gray-50 border border-gray-100">
               <img

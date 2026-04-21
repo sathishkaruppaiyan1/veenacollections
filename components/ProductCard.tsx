@@ -12,17 +12,27 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onAddToCart, onToggleWishlist, onQuickView, isWishlisted }) => {
+  const isOutOfStock = (product.stock_status === 'outofstock') || (product.manage_stock && product.stock_quantity === 0);
+  
   return (
-    <div className="group bg-white border border-gray-100 p-4 transition hover:shadow-xl relative overflow-hidden">
+    <div className={`group bg-white border border-gray-100 p-4 transition hover:shadow-xl relative overflow-hidden ${isOutOfStock ? 'opacity-80 grayscale bg-gray-50' : ''}`}>
+      {/* Out of Stock Label */}
+      {((product.stock_status === 'outofstock') || (product.manage_stock && product.stock_quantity === 0)) && (
+        <div className="absolute top-4 right-4 z-20 bg-black text-white text-[10px] font-bold uppercase px-3 py-1 tracking-widest shadow-lg">
+          Out of Stock
+        </div>
+      )}
       {/* Actions Floating Left - Theme Specific - Visible on mobile, hover-only on desktop */}
       <div className="absolute left-4 top-4 z-10 flex flex-col space-y-2 transition-all duration-300 opacity-100 translate-x-0 lg:opacity-0 lg:-translate-x-10 lg:group-hover:opacity-100 lg:group-hover:translate-x-0">
-        <button
-          onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
-          className="w-10 h-10 bg-[#EE6348] text-white rounded-full flex items-center justify-center hover:bg-black transition shadow-md"
-          title="Add to Cart"
-        >
-          <ShoppingCart size={16} />
-        </button>
+        {((product.stock_status !== 'outofstock') && !(product.manage_stock && product.stock_quantity === 0)) && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
+            className="w-10 h-10 bg-[#EE6348] text-white rounded-full flex items-center justify-center hover:bg-black transition shadow-md"
+            title="Add to Cart"
+          >
+            <ShoppingCart size={16} />
+          </button>
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleWishlist(product); }}
           className={`w-10 h-10 rounded-full flex items-center justify-center transition shadow-md ${isWishlisted ? 'bg-black text-[#EE6348]' : 'bg-[#EE6348] text-white hover:bg-black'}`}

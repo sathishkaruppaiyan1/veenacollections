@@ -24,7 +24,22 @@ const API_BASE = isDev ? '/wp-json' : `${WP_CONFIG.SITE_URL}/wp-json`;
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
+    let message = `API Error: ${response.status}`;
+    let code = 'error';
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.code) code = errorJson.code;
+      if (errorJson.message) {
+        // Strip HTML tags from the message (e.g., links to login)
+        message = errorJson.message.replace(/<[^>]*>/g, '');
+      }
+    } catch (e) {
+      // Fallback if not JSON
+      message = `${message} - ${errorText.substring(0, 150)}`;
+    }
+    const err = new Error(message) as any;
+    err.code = code;
+    throw err;
   }
   return response.json();
 };
@@ -151,6 +166,9 @@ const normalizeHomeReel = async (item: any, index: number): Promise<HomeReel> =>
   category: item.category || item.category_name || undefined
 });
 
+let searchCache: any[] | null = null;
+let isCaching = false;
+
 export const api = {
   // -----------------------------------------------------------
   // 1. Fetch Products from WooCommerce
@@ -210,6 +228,8 @@ export const api = {
           images,
           image: images[0],
           category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+          categories: Array.isArray(item.categories) ? item.categories.map((c: any) => c.name) : [],
+          categoryIds: Array.isArray(item.categories) ? item.categories.map((c: any) => c.id) : [],
           sku: item.sku,
           type: item.type,
           attributes: item.attributes || [],
@@ -231,12 +251,54 @@ export const api = {
   searchProducts: async (query: string): Promise<Product[]> => {
     try {
       if (!query) return [];
-      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
-        return MOCK_PRODUCTS.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+
+      // Initialize background cache for partial SKU searches
+      if (searchCache === null && !isCaching && !WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        isCaching = true;
+        Promise.all([
+          wcFetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&per_page=100&page=1`),
+          wcFetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&per_page=100&page=2`)
+        ]).then(async ([res1, res2]) => {
+          let cached = [];
+          if (res1.ok) cached.push(...(await res1.json()));
+          if (res2.ok) cached.push(...(await res2.json()));
+          searchCache = cached;
+          isCaching = false;
+        }).catch(() => { isCaching = false; });
       }
 
-      const response = await wcFetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&search=${encodeURIComponent(query)}&per_page=5`);
-      const data = await handleResponse(response);
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        return MOCK_PRODUCTS.filter(p => 
+          p.name.toLowerCase().includes(query.toLowerCase()) || 
+          (p.sku && p.sku.toLowerCase().includes(query.toLowerCase()))
+        );
+      }
+
+      const [searchResponse, skuResponse] = await Promise.all([
+        wcFetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&search=${encodeURIComponent(query)}&per_page=5`),
+        wcFetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&sku=${encodeURIComponent(query)}&per_page=5`)
+      ]);
+      
+      let allData: any[] = [];
+      if (searchResponse.ok) {
+        allData = [...allData, ...(await searchResponse.json())];
+      }
+      if (skuResponse.ok) {
+        allData = [...allData, ...(await skuResponse.json())];
+      }
+
+      // Check local cache for partial SKU matches
+      if (searchCache) {
+          const lowerQuery = query.toLowerCase();
+          const partialMatches = searchCache.filter(p => 
+              (p.sku && String(p.sku).toLowerCase().includes(lowerQuery)) ||
+              (p.name && String(p.name).toLowerCase().includes(lowerQuery))
+          );
+          allData = [...allData, ...partialMatches];
+      }
+
+      const uniqueData = Array.from(new Map(allData.map((item: any) => [item.id, item])).values());
+      const data = uniqueData.slice(0, 5);
 
       return data.map((item: any) => {
         const images = mapProductImages(item);
@@ -251,6 +313,8 @@ export const api = {
           images,
           image: images[0],
           category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+          categories: Array.isArray(item.categories) ? item.categories.map((c: any) => c.name) : [],
+          categoryIds: Array.isArray(item.categories) ? item.categories.map((c: any) => c.id) : [],
           sku: item.sku,
           type: item.type,
           attributes: item.attributes || [],
@@ -318,6 +382,8 @@ export const api = {
           images,
           image: images[0],
           category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+          categories: Array.isArray(item.categories) ? item.categories.map((c: any) => c.name) : [],
+          categoryIds: Array.isArray(item.categories) ? item.categories.map((c: any) => c.id) : [],
           sku: item.sku,
           type: item.type,
           attributes: item.attributes || [],
@@ -366,25 +432,107 @@ export const api = {
   },
 
   // -----------------------------------------------------------
+  // 1c. Fetch Best Seller Products (tagged "best-sellers" in WooCommerce)
+  //
+  // HOW TO SET UP IN WORDPRESS ADMIN:
+  // 1. Go to Products > Tags > Create a tag with slug "best-sellers"
+  // 2. Edit any product and add this tag to include it as a Best Seller
+  // -----------------------------------------------------------
+  getBestSellerProducts: async (): Promise<Product[]> => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        return MOCK_PRODUCTS.slice(0, 4);
+      }
+
+      // First, get the tag ID for "best-sellers"
+      const tagResponse = await wcFetch(`${API_BASE}/wc/v3/products/tags?${getAuthParams()}&slug=best-sellers`);
+      const tagData = await tagResponse.json();
+
+      if (!tagData || tagData.length === 0) {
+        console.warn("Tag 'best-sellers' not found. Create it in WooCommerce > Products > Tags");
+        return [];
+      }
+
+      const tagId = tagData[0].id;
+
+      // Fetch products with the tag ID
+      const response = await wcFetch(`${API_BASE}/wc/v3/products?${getAuthParams()}&tag=${tagId}&per_page=100&status=publish`);
+      const data = await handleResponse(response);
+
+      return data.map((item: any) => {
+        const images = mapProductImages(item);
+        return {
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          permalink: item.permalink,
+          price: parseFloat(item.price || 0),
+          oldPrice: item.regular_price ? parseFloat(item.regular_price) : undefined,
+          rating: Math.round(parseFloat(item.average_rating)) || 0,
+          images,
+          image: images[0],
+          category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+          categories: Array.isArray(item.categories) ? item.categories.map((c: any) => c.name) : [],
+          categoryIds: Array.isArray(item.categories) ? item.categories.map((c: any) => c.id) : [],
+          sku: item.sku,
+          type: item.type,
+          attributes: item.attributes || [],
+          date_created: item.date_created,
+          sale_price: item.sale_price,
+          date_on_sale_to: item.date_on_sale_to,
+          short_description: stripManufacturerHtml(item.short_description),
+          description: stripManufacturerHtml(item.description),
+          stock_quantity: item.stock_quantity ?? null,
+          stock_status: item.stock_status || 'instock',
+          manage_stock: item.manage_stock || false
+        };
+      });
+
+    } catch (error) {
+      console.error("Failed to fetch best seller products:", error);
+      return [];
+    }
+  },
+
+  // -----------------------------------------------------------
   // 2. Fetch Categories from WooCommerce
   // -----------------------------------------------------------
   getCategories: async (): Promise<Category[]> => {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return CATEGORIES;
 
-      // Fetch all categories including empty ones (hide_empty=false)
-      const response = await wcFetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=false&per_page=100&parent=0`);
+      // Fetch ALL categories (top-level + subcategories) so the app knows the
+      // hierarchy. We filter to top-level for the home grid, and to children
+      // of the current category for the filter sidebar on the shop page.
+      const response = await wcFetch(`${API_BASE}/wc/v3/products/categories?${getAuthParams()}&hide_empty=false&per_page=100&orderby=id&order=asc`);
       const data = await handleResponse(response);
 
-      console.log('Fetched categories:', data.length, data.map((c: any) => c.name));
+      console.log('Fetched categories:', data.length, data.map((c: any) => ({ name: c.name, id: c.id, parent: c.parent, menu_order: c.menu_order })));
 
-      return data.map((item: any) => ({
+      const mapped: Category[] = data.map((item: any) => ({
         id: item.id,
         name: item.name,
         count: item.count || 0,
+        menu_order: typeof item.menu_order === 'number' ? item.menu_order : 0,
+        parent: typeof item.parent === 'number' ? item.parent : 0,
         // WooCommerce categories usually have an 'image' object if set
         image: item.image?.src || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=B8A99A&color=fff&size=400&bold=true`
       }));
+
+      // Match WooCommerce admin ordering: menu_order ASC, then id ASC (creation order).
+      // This respects the per-category "Display order" set in WC admin when present,
+      // and preserves the order in which categories were added otherwise.
+      const hasCustomOrder = mapped.some(c => (c.menu_order ?? 0) > 0);
+      mapped.sort((a, b) => {
+        if (hasCustomOrder) {
+          const ao = a.menu_order ?? 0;
+          const bo = b.menu_order ?? 0;
+          if (ao !== bo) return ao - bo;
+        }
+        return a.id - b.id;
+      });
+
+      return mapped;
 
     } catch (error) {
       console.error("Failed to fetch categories from API, using fallback:", error);
@@ -459,6 +607,8 @@ export const api = {
         images,
         image: images[0],
         category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',
+        categories: Array.isArray(item.categories) ? item.categories.map((c: any) => c.name) : [],
+        categoryIds: Array.isArray(item.categories) ? item.categories.map((c: any) => c.id) : [],
         sku: item.sku,
         type: item.type,
         attributes: item.attributes || [],
@@ -1203,6 +1353,50 @@ export const api = {
     } catch (error) {
       console.error("Failed to fetch customer:", error);
       return null;
+    }
+  },
+  
+  // -----------------------------------------------------------
+  // 7j. Register Customer
+  // -----------------------------------------------------------
+  registerCustomer: async (customerData: {
+    email: string;
+    first_name: string;
+    last_name: string;
+    billing: {
+      first_name: string;
+      last_name: string;
+      address_1: string;
+      city: string;
+      state: string;
+      postcode: string;
+      country: string;
+      email: string;
+    };
+    password?: string;
+  }) => {
+    try {
+      if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
+        return { id: Date.now(), ...customerData };
+      }
+
+      // Create customer. If WooCommerce is configured to "Automatically generate account password",
+      // it will do so and email the user because no password is included here.
+      const dataToSend = {
+        ...customerData,
+        username: customerData.email.split('@')[0]
+      };
+
+      const response = await fetch(`${API_BASE}/wc/v3/customers?${getAuthParams()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSend)
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error("Failed to register customer:", error);
+      throw error;
     }
   },
 

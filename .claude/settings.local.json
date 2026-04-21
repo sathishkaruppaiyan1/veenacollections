@@ -10,7 +10,11 @@
       "Bash(git -C \"C:/Users/sathi/veenacollections\" rm --cached nul)",
       "Bash(git -C \"C:/Users/sathi/veenacollections\" update-index --remove nul)",
       "mcp__ide__getDiagnostics",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npx tsc *)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq npm*\")",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(node -e \"const fs=require\\('fs'\\);let s=fs.readFileSync\\('api.ts','utf8'\\);const oldLine=\\\\\"category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',\\\\\";const newLines=oldLine+'\\\\n          categories: Array.isArray\\(item.categories\\) ? item.categories.map\\(\\(c\\) => c.name\\) : [],\\\\n          categoryIds: Array.isArray\\(item.categories\\) ? item.categories.map\\(\\(c\\) => c.id\\) : [],';console.log\\('count:',s.split\\(oldLine\\).length-1\\);\")"
     ]
   }
 }
