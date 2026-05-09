@@ -15,10 +15,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onAd
   const isOutOfStock = (product.stock_status === 'outofstock') || (product.manage_stock && product.stock_quantity === 0);
   
   return (
-    <div className={`group bg-white border border-gray-100 p-4 transition hover:shadow-xl relative overflow-hidden ${isOutOfStock ? 'opacity-80 grayscale bg-gray-50' : ''}`}>
+    <div className="group bg-white border border-gray-100 p-4 transition hover:shadow-xl relative overflow-hidden">
       {/* Out of Stock Label */}
       {((product.stock_status === 'outofstock') || (product.manage_stock && product.stock_quantity === 0)) && (
-        <div className="absolute top-4 right-4 z-20 bg-black text-white text-[10px] font-bold uppercase px-3 py-1 tracking-widest shadow-lg">
+        <div className="absolute top-4 right-4 z-20 bg-black text-white text-[10px] font-bold uppercase px-3 py-1 tracking-widest shadow-lg rounded-sm">
           Out of Stock
         </div>
       )}

@@ -334,6 +334,14 @@ const App: React.FC = () => {
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [selectedProductImage, setSelectedProductImage] = useState<string | null>(null);
   const [productQuantity, setProductQuantity] = useState(1);
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem('veena_recently_viewed');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
@@ -705,6 +713,20 @@ const App: React.FC = () => {
 
     setSelectedProductImage(activeProduct.images?.[0] || activeProduct.image);
   }, [activeProduct, currentVariation]);
+
+  useEffect(() => {
+    if (!activeProduct) return;
+
+    setRecentlyViewedIds(prev => {
+      const next = [activeProduct.id, ...prev.filter(id => id !== activeProduct.id)].slice(0, 8);
+      try {
+        localStorage.setItem('veena_recently_viewed', JSON.stringify(next));
+      } catch {
+        // Ignore storage failures and keep the in-memory list.
+      }
+      return next;
+    });
+  }, [activeProduct?.id]);
 
   // Handle Sidebar Attribute Toggles
   const toggleAttributeFilter = (attrName: string, termSlug: string) => {
@@ -2377,6 +2399,45 @@ const App: React.FC = () => {
     const displayImage = selectedProductImage || galleryImages[0] || activeProduct.image;
     const displayPrice = currentVariation ? currentVariation.price : activeProduct.price;
     const productDescription = getPreferredProductDescription(activeProduct);
+    const recentlyViewedProducts = recentlyViewedIds
+      .filter(id => id !== activeProduct.id)
+      .map(id => products.find(product => product.id === id))
+      .filter((product): product is Product => Boolean(product));
+    const relatedProducts = products.filter(product => {
+      if (product.id === activeProduct.id) return false;
+      if (activeProduct.categoryIds?.length && product.categoryIds?.length) {
+        return activeProduct.categoryIds.some(categoryId => product.categoryIds?.includes(categoryId));
+      }
+      if (activeProduct.categories?.length && product.categories?.length) {
+        return activeProduct.categories.some(category => product.categories?.includes(category));
+      }
+      return product.category === activeProduct.category;
+    }).slice(0, 8);
+
+    const renderProductSection = (title: string, items: Product[], emptyMessage: string) => (
+      <div className="mt-10">
+        <h2 className="text-2xl font-bold uppercase font-heading text-gray-800 mb-5">{title}</h2>
+        {items.length === 0 ? (
+          <div className="border border-gray-100 bg-gray-50 px-6 py-10 text-center text-sm text-gray-500">
+            {emptyMessage}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {items.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onClick={handleProductClick}
+                onAddToCart={addToCart}
+                onToggleWishlist={toggleWishlist}
+                onQuickView={handleQuickView}
+                isWishlisted={isInWishlist(product.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
 
     return (
       <div className="container mx-auto px-4 py-8">
@@ -2546,6 +2607,9 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {recentlyViewedProducts.length > 0 && renderProductSection('Recently Viewed Products', recentlyViewedProducts, 'Products you viewed recently will appear here.')}
+        {renderProductSection('Related Products', relatedProducts, 'Related products will appear here once matching items are available.')}
       </div>
     );
   };
@@ -3243,7 +3307,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen flex flex-col font-sans relative">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden flex flex-col font-sans relative">
       <Toast message={toast.message} visible={toast.visible} />
 
       <Header
