@@ -25,21 +25,22 @@ export const CookieConsent: React.FC<CookieConsentProps> = ({ onViewPolicy }) =>
     if (!isVisible) return null;
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-[100] p-4 md:p-6 animate-in slide-in-from-bottom duration-500">
-            <div className="container mx-auto max-w-6xl">
-                <div className="bg-white border border-gray-200 shadow-2xl rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
+        <div className="fixed bottom-0 left-0 right-0 z-[100] p-3 md:p-6 animate-in slide-in-from-bottom duration-500">
+            <div className="container mx-auto max-w-6xl max-w-full">
+                <div className="bg-white border border-gray-200 shadow-2xl rounded-lg md:rounded-xl p-5 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 md:gap-6 overflow-hidden relative max-w-full">
                     {/* Accent decoration */}
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-[#EE6348]"></div>
 
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-3 md:gap-4 min-w-0 w-full">
                         <div className="bg-orange-50 p-3 rounded-full text-[#EE6348] flex-shrink-0">
                             <Cookie size={24} />
                         </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-gray-800 mb-1 flex items-center">
-                                Cookie Consent <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase tracking-wide">California Notice</span>
+                        <div className="min-w-0">
+                            <h3 className="text-lg font-bold text-gray-800 mb-1 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                <span>Cookie Consent</span>
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase tracking-wide w-fit">California Notice</span>
                             </h3>
-                            <p className="text-sm text-gray-500 leading-relaxed max-w-3xl">
+                            <p className="text-sm text-gray-500 leading-relaxed max-w-3xl break-words">
                                 We use cookies to enhance your experience, analyze site usage, and support our marketing efforts.
                                 California residents have the right to opt-out of the "sale" or "sharing" of their personal information.
                                 By clicking "Accept", you agree to our use of cookies as described in our{' '}
@@ -50,12 +51,12 @@ export const CookieConsent: React.FC<CookieConsentProps> = ({ onViewPolicy }) =>
                                     Privacy & Cookie Policy
                                 </button>.
                             </p>
-                            <div className="mt-3 flex items-center space-x-4">
+                            <div className="mt-3 flex items-center">
                                 <button
                                     onClick={onViewPolicy}
-                                    className="text-xs text-blue-600 font-bold hover:underline flex items-center"
+                                    className="text-xs text-blue-600 font-bold hover:underline flex items-start text-left break-words"
                                 >
-                                    <ShieldAlert size={12} className="mr-1" /> Do Not Sell or Share My Personal Information
+                                    <ShieldAlert size={12} className="mr-1 mt-0.5 flex-shrink-0" /> Do Not Sell or Share My Personal Information
                                 </button>
                             </div>
                         </div>
