@@ -85,13 +85,53 @@ export interface CartItem extends Product {
   maxQty?: number | null; // max purchasable qty from stock, null = unlimited
 }
 
+export interface OrderAddress {
+  first_name?: string;
+  last_name?: string;
+  company?: string;
+  address_1?: string;
+  address_2?: string;
+  city?: string;
+  state?: string;
+  postcode?: string;
+  country?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface OrderLineItem {
+  id?: number;
+  name: string;
+  quantity: number;
+  total: string;
+  subtotal?: string;
+  price?: number;
+  sku?: string;
+  product_id?: number;
+  variation_id?: number;
+  image?: string;
+  meta?: Array<{ label: string; value: string }>; // variation attributes (Size, Colour...)
+}
+
 export interface Order {
   id: number;
+  number?: string;
   status: string;
   date_created: string; // ISO string
+  date_paid?: string | null;
   total: string;
   currency: string;
-  line_items: Array<{ name: string; quantity: number; total: string }>;
+  currency_symbol?: string;
+  subtotal?: string;
+  shipping_total?: string;
+  discount_total?: string;
+  total_tax?: string;
+  line_items: OrderLineItem[];
+  billing?: OrderAddress;
+  shipping?: OrderAddress;
+  payment_method_title?: string;
+  shipping_method?: string;
+  customer_note?: string;
 }
 
 export type ViewState = 'home' | 'shop' | 'product' | 'cart' | 'wishlist' | 'register' | 'account' | 'page' | 'checkout' | 'track-order' | 'categories' | 'deal' | 'rent' | 'cookie-policy' | 'thank-you';

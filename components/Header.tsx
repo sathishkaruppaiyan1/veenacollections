@@ -214,33 +214,33 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="bg-white py-4 relative z-20 border-b border-gray-100">
         <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4 w-full">
-            <div className="flex items-center justify-between w-full lg:w-auto">
+            <div className="flex items-center justify-between w-full lg:w-auto gap-3 min-w-0">
               {/* Logo */}
               <div
-                className="flex items-center cursor-pointer flex-shrink-0"
+                className="flex items-center cursor-pointer min-w-0"
                 onClick={() => onNavigate('home')}
               >
                 {siteLogo ? (
                   <img
                     src={siteLogo}
                     alt={siteName}
-                    className="h-24 lg:h-28 mr-3 object-contain"
+                    className="h-14 sm:h-20 lg:h-28 mr-2 sm:mr-3 object-contain flex-shrink-0"
                   />
                 ) : (
-                  <div className="relative w-20 h-20 lg:w-24 lg:h-24 mr-3 border-2 border-gray-200 rounded-full flex items-center justify-center flex-shrink-0 bg-[#EE6348] text-white font-bold text-2xl lg:text-3xl font-heading">
+                  <div className="relative w-12 h-12 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mr-2 sm:mr-3 border-2 border-gray-200 rounded-full flex items-center justify-center flex-shrink-0 bg-[#EE6348] text-white font-bold text-lg sm:text-2xl lg:text-3xl font-heading">
                     VC
                   </div>
                 )}
-                <div className="block">
-                  <h1 className="text-xl md:text-3xl font-bold text-gray-900 tracking-widest font-heading uppercase">{siteName}</h1>
-                  <p className="text-[10px] md:text-sm text-gray-500 tracking-widest uppercase mt-1">Premium Quality... Timeless Elegance...</p>
+                <div className="block min-w-0">
+                  <h1 className="text-base sm:text-xl md:text-3xl font-bold text-gray-900 tracking-wide sm:tracking-widest font-heading uppercase truncate">{siteName}</h1>
+                  <p className="text-[9px] sm:text-[10px] md:text-sm text-gray-500 tracking-wide sm:tracking-widest uppercase mt-0.5 sm:mt-1 truncate">Premium Quality... Timeless Elegance...</p>
                 </div>
               </div>
 
               {/* Burger Menu Button - Mobile Only */}
               <button
                 onClick={() => setIsMenuOpen(true)}
-                className="bg-[#EE6348] hover:bg-black text-white p-2.5 rounded transition duration-300 flex-shrink-0 lg:hidden ml-4"
+                className="bg-[#EE6348] hover:bg-black text-white p-2.5 rounded transition duration-300 flex-shrink-0 lg:hidden"
                 aria-label="Open Menu"
               >
                 <Menu size={20} />

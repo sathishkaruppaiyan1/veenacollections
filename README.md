@@ -35,7 +35,10 @@ The Login / My Account page supports **Sign in with Google**. To enable it:
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**.
 2. Create an **OAuth 2.0 Client ID** (or use an existing one). Application type: **Web application**.
-3. Under **Authorized JavaScript origins**, add your app URL(s), e.g. `http://localhost:5173` and your production URL.
+3. Under **Authorized JavaScript origins**, add your app URL(s):
+   - Local dev: `http://localhost:3000`
+   - Local dev IP form, if you open it that way: `http://127.0.0.1:3000`
+   - Production storefront URL, e.g. `https://your-domain.com`
 4. Copy the **Client ID** and set it in your environment:
    - Create `.env` or `.env.local` with: `VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com`
    - Or copy from [.env.example](.env.example).

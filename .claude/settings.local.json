@@ -14,7 +14,15 @@
       "Bash(npx tsc *)",
       "Bash(taskkill //F //FI \"WINDOWTITLE eq npm*\")",
       "Bash(taskkill //F //IM node.exe)",
-      "Bash(node -e \"const fs=require\\('fs'\\);let s=fs.readFileSync\\('api.ts','utf8'\\);const oldLine=\\\\\"category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',\\\\\";const newLines=oldLine+'\\\\n          categories: Array.isArray\\(item.categories\\) ? item.categories.map\\(\\(c\\) => c.name\\) : [],\\\\n          categoryIds: Array.isArray\\(item.categories\\) ? item.categories.map\\(\\(c\\) => c.id\\) : [],';console.log\\('count:',s.split\\(oldLine\\).length-1\\);\")"
+      "Bash(node -e \"const fs=require\\('fs'\\);let s=fs.readFileSync\\('api.ts','utf8'\\);const oldLine=\\\\\"category: item.categories && item.categories.length > 0 ? item.categories[0].name : 'Uncategorized',\\\\\";const newLines=oldLine+'\\\\n          categories: Array.isArray\\(item.categories\\) ? item.categories.map\\(\\(c\\) => c.name\\) : [],\\\\n          categoryIds: Array.isArray\\(item.categories\\) ? item.categories.map\\(\\(c\\) => c.id\\) : [],';console.log\\('count:',s.split\\(oldLine\\).length-1\\);\")",
+      "Bash(curl *)",
+      "Bash(python -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('id:',d.get\\('id'\\)\\);print\\('country:',d.get\\('country'\\)\\);print\\('default_currency:',d.get\\('default_currency'\\)\\);print\\('charges_enabled:',d.get\\('charges_enabled'\\)\\);print\\('payouts_enabled:',d.get\\('payouts_enabled'\\)\\);print\\('email:',d.get\\('email'\\)\\)\")",
+      "Bash(openssl s_client -connect admin.theveenacollections.com:443 -servername admin.theveenacollections.com)",
+      "Bash(openssl s_client -connect admin.theveenacollections.com:443 -servername admin.theveenacollections.com -showcerts)",
+      "Bash(openssl x509 *)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\('currency :',d.get\\('currency'\\)\\);print\\('amount :',d.get\\('amount_total'\\)\\);print\\('error/status:',d.get\\('status'\\) or d.get\\('error',{}\\).get\\('message'\\)\\)\")",
+      "Bash(grep -noE \"[₹$]\\\\{|AED|Rs\\\\.|toFixed\\\\\\(2\\\\\\)\" App.tsx)"
     ]
   }
 }

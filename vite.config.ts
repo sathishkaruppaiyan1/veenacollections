@@ -12,18 +12,18 @@ export default defineConfig(({ mode }) => {
           '/wp-json': {
             target: 'https://admin.theveenacollections.com',
             changeOrigin: true,
-            secure: true,
+            secure: false,
           },
           '/newsletter-subscribe': {
             target: 'https://admin.theveenacollections.com',
             changeOrigin: true,
-            secure: true,
+            secure: false,
             rewrite: (path) => '/?na=ajaxsub',
           },
           '/wp-comments-post.php': {
             target: 'https://admin.theveenacollections.com',
             changeOrigin: true,
-            secure: true,
+            secure: false,
           },
         },
       },

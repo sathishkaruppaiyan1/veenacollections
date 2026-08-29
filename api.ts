@@ -169,6 +169,46 @@ const normalizeHomeReel = async (item: any, index: number): Promise<HomeReel> =>
 let searchCache: any[] | null = null;
 let isCaching = false;
 
+// Map a raw WooCommerce order into our Order shape (with line item images + totals)
+const mapOrder = (o: any): Order => ({
+  id: o.id,
+  number: o.number ? String(o.number) : String(o.id),
+  status: o.status,
+  date_created: o.date_created,
+  date_paid: o.date_paid || null,
+  total: o.total,
+  currency: o.currency,
+  currency_symbol: o.currency_symbol,
+  subtotal: (o.line_items || []).reduce((acc: number, li: any) => acc + parseFloat(li.subtotal || li.total || '0'), 0).toFixed(2),
+  shipping_total: o.shipping_total,
+  discount_total: o.discount_total,
+  total_tax: o.total_tax,
+  line_items: (o.line_items || []).map((li: any) => ({
+    id: li.id,
+    name: li.name,
+    quantity: li.quantity,
+    total: li.total,
+    subtotal: li.subtotal,
+    price: typeof li.price === 'number' ? li.price : parseFloat(li.price || '0'),
+    sku: li.sku,
+    product_id: li.product_id,
+    variation_id: li.variation_id,
+    image: li.image?.src || undefined,
+    meta: (li.meta_data || [])
+      .filter((m: any) => m && m.key && !String(m.key).startsWith('_'))
+      .map((m: any) => ({
+        label: m.display_key || m.key,
+        value: typeof m.display_value === 'string' ? m.display_value.replace(/<[^>]*>/g, '').trim() : String(m.value ?? '')
+      }))
+      .filter((m: any) => m.value)
+  })),
+  billing: o.billing || undefined,
+  shipping: o.shipping || undefined,
+  payment_method_title: o.payment_method_title || undefined,
+  shipping_method: (o.shipping_lines || [])[0]?.method_title || undefined,
+  customer_note: o.customer_note || undefined
+});
+
 export const api = {
   // -----------------------------------------------------------
   // 1. Fetch Products from WooCommerce
@@ -822,26 +862,39 @@ export const api = {
   // -----------------------------------------------------------
   // 7. Fetch Orders (My Account)
   // -----------------------------------------------------------
-  getOrders: async (): Promise<Order[]> => {
+  getOrders: async (customerEmail?: string): Promise<Order[]> => {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) throw new Error("Mock");
 
-      // In a real app, you would filter by customer_id using current user context
-      const response = await fetch(`${API_BASE}/wc/v3/orders?${getAuthParams()}&per_page=5`);
+      // Scope orders to the signed-in customer. Without an email we cannot tell
+      // whose orders these are, so return nothing rather than leaking other buyers'
+      // addresses and phone numbers into the order details popup.
+      if (!customerEmail) return [];
+
+      const email = customerEmail.toLowerCase();
+      let query = `per_page=20&orderby=date&order=desc`;
+
+      // Registered customers can be filtered server-side by customer id
+      const customerRes = await fetch(`${API_BASE}/wc/v3/customers?${getAuthParams()}&email=${encodeURIComponent(customerEmail)}`);
+      if (customerRes.ok) {
+        const customers = await customerRes.json();
+        if (Array.isArray(customers) && customers[0]?.id) {
+          query += `&customer=${customers[0].id}`;
+        } else {
+          // Guest checkout: fall back to Woo's billing search
+          query += `&search=${encodeURIComponent(customerEmail)}`;
+        }
+      } else {
+        query += `&search=${encodeURIComponent(customerEmail)}`;
+      }
+
+      const response = await fetch(`${API_BASE}/wc/v3/orders?${getAuthParams()}&${query}`);
       const data = await handleResponse(response);
 
-      return data.map((o: any) => ({
-        id: o.id,
-        status: o.status,
-        date_created: o.date_created,
-        total: o.total,
-        currency: o.currency,
-        line_items: o.line_items.map((li: any) => ({
-          name: li.name,
-          quantity: li.quantity,
-          total: li.total
-        }))
-      }));
+      // Final guard: only ever show orders billed to this email
+      return data
+        .map(mapOrder)
+        .filter((o: Order) => (o.billing?.email || '').toLowerCase() === email);
 
     } catch (error) {
       console.warn("Using Mock Orders (Auth failed or demo mode)");
@@ -1160,19 +1213,32 @@ export const api = {
     payment_method: string;
     payment_method_title: string;
     coupon_lines?: Array<{ code: string }>;
-  }): Promise<{ id: number; order_key: string; status: string }> => {
+  }): Promise<{ id: number; order_key: string; status: string; payment_url: string }> => {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
-        return { id: Date.now(), order_key: 'demo-' + Date.now(), status: 'pending' };
+        return { id: Date.now(), order_key: 'demo-' + Date.now(), status: 'pending', payment_url: '' };
       }
+
+      // COD is paid on delivery (no gateway). Every other method is an online
+      // gateway (Stripe), so the order stays "pending" and unpaid until the
+      // customer completes payment on WooCommerce's order-pay page.
+      const isCod = orderData.payment_method === 'cod';
+
+      // Strip empty billing fields. WooCommerce rejects an empty-string email
+      // as "Invalid parameter(s): billing", which blocks Express Checkout for
+      // guests (Stripe collects the email/address on its hosted page instead).
+      const cleanBilling = Object.fromEntries(
+        Object.entries(orderData.billing).filter(([, v]) => v !== '' && v != null)
+      );
 
       const response = await fetch(`${API_BASE}/wc/v3/orders?${getAuthParams()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...orderData,
-          set_paid: orderData.payment_method === 'cod' ? false : false, // COD orders are not paid
-          status: 'processing'
+          billing: cleanBilling,
+          set_paid: false,
+          status: isCod ? 'processing' : 'pending'
         }),
       });
 
@@ -1180,12 +1246,29 @@ export const api = {
       return {
         id: data.id,
         order_key: data.order_key,
-        status: data.status
+        status: data.status,
+        payment_url: data.payment_url || ''
       };
     } catch (error) {
       console.error("Failed to create order:", error);
       throw error;
     }
+  },
+
+  // -----------------------------------------------------------
+  // 7e-b. Create a Stripe-hosted Checkout Session for an order
+  // (handled server-side by the Veena Stripe Direct Checkout plugin)
+  // -----------------------------------------------------------
+  createStripeCheckoutSession: async (orderId: number, orderKey: string): Promise<string> => {
+    const response = await fetch(
+      `${API_BASE}/veena-stripe/v1/session?order_id=${orderId}&order_key=${encodeURIComponent(orderKey)}`,
+      { method: 'POST' }
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.url) {
+      throw new Error(data.error || 'Failed to start Stripe checkout');
+    }
+    return data.url as string;
   },
 
   // -----------------------------------------------------------
@@ -1281,18 +1364,7 @@ export const api = {
         return null;
       }
 
-      return {
-        id: order.id,
-        status: order.status,
-        date_created: order.date_created,
-        total: order.total,
-        currency: order.currency,
-        line_items: order.line_items.map((li: any) => ({
-          name: li.name,
-          quantity: li.quantity,
-          total: li.total
-        }))
-      };
+      return mapOrder(order);
     } catch (error) {
       console.error("Failed to fetch order:", error);
       return null;

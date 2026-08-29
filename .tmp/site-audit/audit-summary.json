@@ -1,0 +1,13 @@
+[
+  {
+    "page": "Product Detail",
+    "url": "https://theveenacollections.com/?view=product&id=2366",
+    "http": 200,
+    "desktop": "ok",
+    "mobile": "root-missing, very-short-render, small-screenshot",
+    "h1": "VEENA COLLECTIONS",
+    "screenshotDesktop": ".tmp\\site-audit\\screenshots\\product-detail-desktop.png",
+    "screenshotMobile": ".tmp\\site-audit\\screenshots\\product-detail-mobile.png",
+    "problems": "mobile:root-missing; mobile:very-short-render; mobile:small-screenshot"
+  }
+]

@@ -9,11 +9,13 @@ import { WriteReviewModal } from './components/WriteReviewModal';
 import { SocialShare } from './components/SocialShare';
 import { CookieConsent } from './components/CookieConsent';
 import { CookiePolicy } from './components/CookiePolicy';
+import { OrderDetailsModal, statusStyles } from './components/OrderDetailsModal';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { api } from './api';
 import { Product, ViewState, CartItem, Category, NavItem, Variation, Order, HomeHeroBanner, HomeReel } from './types';
 import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, UserCircle2, Package, MapPin, LogOut, CreditCard, Quote, Tag, Truck, Phone, Mail, Play, Facebook, Instagram } from 'lucide-react';
 
+const ORDER_ITEM_PLACEHOLDER = 'https://placehold.co/200x200/f3f4f6/9ca3af?text=Item';
 const DEFAULT_LOGO = "https://admin.theveenacollections.com/wp-content/uploads/2025/11/Blue-White-Modern-Minimalist-Name-Logo-2.png";
 
 interface DealProps {
@@ -342,7 +344,22 @@ const App: React.FC = () => {
       return [];
     }
   });
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('veena_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('veena_cart', JSON.stringify(cart));
+    } catch {
+      // ignore storage failures (private mode, quota)
+    }
+  }, [cart]);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -656,6 +673,43 @@ const App: React.FC = () => {
     );
   };
 
+  // Express checkout: cart -> Stripe directly, skipping the on-site billing form.
+  // Stripe Checkout collects the email/address; the WP snippet writes it back to
+  // the order on return. (The full billing form still exists in CheckoutView and
+  // can be re-enabled later by pointing the cart button back to 'checkout'.)
+  const [expressLoading, setExpressLoading] = useState(false);
+  const handleExpressCheckout = async () => {
+    if (cart.length === 0) { showToast('Your cart is empty'); return; }
+    setExpressLoading(true);
+    try {
+      const nameParts = (user?.name || '').trim().split(' ');
+      const order = await api.createOrder({
+        billing: {
+          first_name: nameParts[0] || '',
+          last_name: nameParts.slice(1).join(' ') || '',
+          address_1: '',
+          city: '',
+          phone: '',
+          email: user?.email || '',
+        },
+        line_items: cart.map(item => ({
+          product_id: item.id,
+          quantity: item.quantity,
+          variation_id: item.variationId,
+        })),
+        payment_method: 'stripe',
+        payment_method_title: 'Credit / Debit Card',
+      });
+      setLastOrderId(order.id.toString());
+      const stripeUrl = await api.createStripeCheckoutSession(order.id, order.order_key);
+      window.location.href = stripeUrl;
+    } catch (error) {
+      console.error('Express checkout failed:', error);
+      showToast('Could not start checkout. Please try again.');
+      setExpressLoading(false);
+    }
+  };
+
   const toggleWishlist = (product: Product) => {
     setWishlist(prev => {
       const exists = prev.find(p => p.id === product.id);
@@ -743,6 +797,20 @@ const App: React.FC = () => {
   // --- Views ---
 
   const [lastOrderId, setLastOrderId] = useState<string>('');
+
+  // Handle the return from Stripe-hosted Checkout: the WordPress plugin redirects
+  // back to /?view=thank-you&order_paid=<id> after marking the order paid.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paidOrderId = params.get('order_paid');
+    if (paidOrderId) {
+      setLastOrderId(paidOrderId);
+      setCart([]);
+      setView('thank-you');
+      // Strip the query params so a refresh doesn't re-trigger this.
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const getPreferredProductDescription = (product: Product): string => {
     const hasMeaningfulHtml = (html?: string) =>
@@ -837,6 +905,12 @@ const App: React.FC = () => {
         return;
       }
 
+      if (cart.length === 0) {
+        setToast({ message: "Your cart is empty", visible: true });
+        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+        return;
+      }
+
       setPlacingOrder(true);
 
       try {
@@ -861,6 +935,17 @@ const App: React.FC = () => {
 
         console.log("Order created:", order);
 
+        // Online gateways (Stripe): send the customer straight to Stripe-hosted
+        // Checkout (checkout.stripe.com). The order stays "pending" until the
+        // Stripe Direct Checkout plugin marks it paid on return.
+        if (selectedPayment !== 'cod') {
+          setLastOrderId(order.id.toString());
+          const stripeUrl = await api.createStripeCheckoutSession(order.id, order.order_key);
+          window.location.href = stripeUrl;
+          return;
+        }
+
+        // COD (or any non-redirect method): complete the order locally.
         // REAL-TIME STOCK UPDATE: Decrement local stock immediately after purchase
         setProducts(prevProducts => {
           return prevProducts.map(mainProduct => {
@@ -1082,57 +1167,141 @@ const App: React.FC = () => {
     );
   };
 
-  const ThankYouView = () => (
-    <div className="container mx-auto px-4 py-16">
-      <div className="max-w-2xl mx-auto text-center">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Check size={40} className="text-green-600" />
-        </div>
-        <h1 className="text-3xl font-bold uppercase font-heading text-gray-800 mb-4">Thank You!</h1>
-        <p className="text-lg text-gray-600 mb-2">Your order has been placed successfully.</p>
-        {lastOrderId && (
-          <p className="text-sm text-gray-500 mb-8">Order ID: <span className="font-bold text-[#EE6348]">{lastOrderId}</span></p>
-        )}
+  const ThankYouView = () => {
+    const [orderDetails, setOrderDetails] = useState<Order | null>(null);
+    const [loadingOrder, setLoadingOrder] = useState(false);
 
-        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-8">
-          <h3 className="font-bold text-gray-800 mb-2">What happens next?</h3>
-          <ul className="text-sm text-gray-600 space-y-2 text-left">
-            <li className="flex items-start gap-2">
-              <Check size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
-              You will receive an order confirmation email shortly.
-            </li>
-            <li className="flex items-start gap-2">
-              <Check size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
-              Our team will process your order within 24 hours.
-            </li>
-            <li className="flex items-start gap-2">
-              <Check size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
-              You can track your order status in your account.
-            </li>
-          </ul>
-        </div>
+    useEffect(() => {
+      if (!lastOrderId) return;
+      let cancelled = false;
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            onClick={() => handleNavigate('shop')}
-            className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 hover:bg-black transition"
-          >
-            Continue Shopping
-          </button>
-          <button
-            onClick={() => handleNavigate('track-order')}
-            className="border-2 border-[#EE6348] text-[#EE6348] font-bold uppercase px-8 py-3 hover:bg-[#EE6348] hover:text-white transition"
-          >
-            Track Order
-          </button>
+      const fetchOrder = async (attempt = 0) => {
+        setLoadingOrder(true);
+        const order = await api.getOrderById(Number(lastOrderId));
+        if (cancelled) return;
+
+        // The Stripe plugin writes the address onto the order server-side just
+        // before redirecting here. If it hasn't propagated yet, retry once.
+        const hasAddress = Boolean(order?.billing?.address_1 || order?.shipping?.address_1);
+        if (order && !hasAddress && attempt < 2) {
+          setTimeout(() => fetchOrder(attempt + 1), 1500);
+          return;
+        }
+        setOrderDetails(order);
+        setLoadingOrder(false);
+      };
+
+      fetchOrder();
+      return () => { cancelled = true; };
+    }, [lastOrderId]);
+
+    const addr = orderDetails?.shipping?.address_1 ? orderDetails.shipping : orderDetails?.billing;
+    const fullName = [addr?.first_name, addr?.last_name].filter(Boolean).join(' ');
+    const hasAddress = Boolean(addr?.address_1);
+
+    return (
+      <div className="container mx-auto px-4 py-16">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Check size={40} className="text-green-600" />
+          </div>
+          <h1 className="text-3xl font-bold uppercase font-heading text-gray-800 mb-4">Thank You!</h1>
+          <p className="text-lg text-gray-600 mb-2">Your order has been placed successfully.</p>
+          {lastOrderId && (
+            <p className="text-sm text-gray-500 mb-8">Order ID: <span className="font-bold text-[#EE6348]">#{lastOrderId}</span></p>
+          )}
+
+          {loadingOrder && !orderDetails && (
+            <div className="flex justify-center py-6">
+              <Loader2 size={28} className="animate-spin text-[#EE6348]" />
+            </div>
+          )}
+
+          {orderDetails && (
+            <div className="text-left space-y-4 mb-8">
+              {/* Order items */}
+              <div className="bg-white p-6 rounded-lg border border-gray-200">
+                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <Package size={18} className="text-[#EE6348]" /> Order Summary
+                </h3>
+                <div className="space-y-3">
+                  {orderDetails.line_items.map((li, idx) => (
+                    <div key={idx} className="flex justify-between text-sm text-gray-700">
+                      <span>{li.name} <span className="text-gray-400">× {li.quantity}</span></span>
+                      <span className="font-medium">${li.total}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-gray-200 mt-4 pt-4 flex justify-between font-bold text-gray-800">
+                  <span>Total</span>
+                  <span className="text-[#EE6348]">${orderDetails.total}</span>
+                </div>
+                {orderDetails.payment_method_title && (
+                  <p className="text-xs text-gray-500 mt-2">Paid via {orderDetails.payment_method_title}</p>
+                )}
+              </div>
+
+              {/* Delivery address */}
+              {hasAddress && (
+                <div className="bg-white p-6 rounded-lg border border-gray-200">
+                  <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <MapPin size={18} className="text-[#EE6348]" /> Delivery Address
+                  </h3>
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    {fullName && <p className="font-medium">{fullName}</p>}
+                    {addr?.address_1 && <p>{addr.address_1}</p>}
+                    {addr?.address_2 && <p>{addr.address_2}</p>}
+                    <p>{[addr?.city, addr?.state, addr?.postcode].filter(Boolean).join(', ')}</p>
+                    {addr?.country && <p>{addr.country}</p>}
+                    {orderDetails.billing?.phone && <p className="mt-1 text-gray-500">{orderDetails.billing.phone}</p>}
+                    {orderDetails.billing?.email && <p className="text-gray-500">{orderDetails.billing.email}</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-8">
+            <h3 className="font-bold text-gray-800 mb-2">What happens next?</h3>
+            <ul className="text-sm text-gray-600 space-y-2 text-left">
+              <li className="flex items-start gap-2">
+                <Check size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
+                You will receive an order confirmation email shortly.
+              </li>
+              <li className="flex items-start gap-2">
+                <Check size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
+                Our team will process your order within 24 hours.
+              </li>
+              <li className="flex items-start gap-2">
+                <Check size={16} className="text-green-600 mt-0.5 flex-shrink-0" />
+                You can track your order status in your account.
+              </li>
+            </ul>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={() => handleNavigate('shop')}
+              className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 hover:bg-black transition"
+            >
+              Continue Shopping
+            </button>
+            <button
+              onClick={() => handleNavigate('track-order')}
+              className="border-2 border-[#EE6348] text-[#EE6348] font-bold uppercase px-8 py-3 hover:bg-[#EE6348] hover:text-white transition"
+            >
+              Track Order
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const AccountView = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loadingOrders, setLoadingOrders] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [orderTracking, setOrderTracking] = useState<Record<number, Array<{
       tracking_number: string;
       tracking_provider: string;
@@ -1171,7 +1340,7 @@ const App: React.FC = () => {
     useEffect(() => {
       if (accountTab === 'orders') {
         setLoadingOrders(true);
-        api.getOrders().then(async (fetchedOrders) => {
+        api.getOrders(user?.email).then(async (fetchedOrders) => {
           setOrders(fetchedOrders);
           // Fetch tracking for each order
           const trackingData: Record<number, any[]> = {};
@@ -1184,7 +1353,7 @@ const App: React.FC = () => {
           setOrderTracking(trackingData);
         }).finally(() => setLoadingOrders(false));
       }
-    }, [accountTab]);
+    }, [accountTab, user?.email]);
 
     useEffect(() => {
       if (accountTab === 'addresses' && user?.email) {
@@ -1255,71 +1424,122 @@ const App: React.FC = () => {
 
             {accountTab === 'orders' && (
               <div>
-                <h2 className="text-lg font-bold text-gray-800 mb-6">Recent Orders</h2>
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-lg font-bold text-gray-800">My Orders</h2>
+                  {orders.length > 0 && (
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>
+                  )}
+                </div>
                 {loadingOrders ? (
-                  <div className="flex justify-center py-8"><Loader2 className="animate-spin text-[#EE6348]" /></div>
+                  <div className="flex justify-center py-12"><Loader2 className="animate-spin text-[#EE6348]" /></div>
                 ) : orders.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-gray-50 text-gray-600 font-bold uppercase">
-                        <tr>
-                          <th className="p-3">Order</th>
-                          <th className="p-3">Date</th>
-                          <th className="p-3">Status</th>
-                          <th className="p-3">Total</th>
-                          <th className="p-3">Tracking</th>
-                          <th className="p-3">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {orders.map(order => {
-                          const tracking = orderTracking[order.id];
-                          return (
-                            <tr key={order.id} className="hover:bg-gray-50">
-                              <td className="p-3 font-bold text-[#EE6348]">#{order.id}</td>
-                              <td className="p-3 text-gray-600">{new Date(order.date_created).toLocaleDateString()}</td>
-                              <td className="p-3"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${order.status === 'completed' ? 'bg-green-100 text-green-700' : order.status === 'shipped' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.status}</span></td>
-                              <td className="p-3 font-bold text-gray-700">${order.total}</td>
-                              <td className="p-3">
-                                {tracking && tracking.length > 0 ? (
-                                  <div className="space-y-1">
-                                    {tracking.map((t, idx) => (
-                                      <div key={idx} className="text-xs">
-                                        <div className="text-gray-600">
-                                          <span className="font-bold">{t.tracking_provider}</span>
-                                        </div>
-                                        <div className="text-gray-500">{t.tracking_number}</div>
-                                        {t.tracking_link && (
-                                          <a
-                                            href={t.tracking_link}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-[#EE6348] font-bold hover:underline mt-1"
-                                          >
-                                            <Truck size={12} /> Track
-                                          </a>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-400 text-xs italic">Not shipped</span>
-                                )}
-                              </td>
-                              <td className="p-3">
-                                <button className="bg-[#EE6348] text-white px-3 py-1 text-xs rounded hover:bg-black transition">View</button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <div className="space-y-3">
+                    {orders.map(order => {
+                      const tracking = orderTracking[order.id] || [];
+                      const sty = statusStyles(order.status);
+                      const items = order.line_items || [];
+                      const itemCount = items.reduce((acc, li) => acc + (li.quantity || 0), 0);
+                      const thumbs = items.slice(0, 3);
+                      return (
+                        <div key={order.id} className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                          {/* Card header */}
+                          <div className="flex items-center justify-between px-4 py-3 bg-gray-50/70 border-b border-gray-100">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-gray-900 leading-tight">#{order.number || order.id}</p>
+                              <p className="text-[11px] text-gray-500">
+                                {new Date(order.date_created).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                                {' · '}{itemCount} item{itemCount !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                            <span className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${sty.pill}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${sty.dot}`} />{sty.label}
+                            </span>
+                          </div>
+
+                          {/* Card body: item thumbnails + summary */}
+                          <div className="px-4 py-3 flex items-center gap-3">
+                            <div className="flex -space-x-3 shrink-0">
+                              {thumbs.map((item, idx) => (
+                                <img
+                                  key={item.id ?? idx}
+                                  src={item.image || ORDER_ITEM_PLACEHOLDER}
+                                  alt={item.name}
+                                  loading="lazy"
+                                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = ORDER_ITEM_PLACEHOLDER; }}
+                                  className="w-14 h-14 rounded-xl object-cover bg-gray-100 border-2 border-white shadow-sm"
+                                />
+                              ))}
+                              {items.length > 3 && (
+                                <div className="w-14 h-14 rounded-xl bg-gray-100 border-2 border-white shadow-sm flex items-center justify-center text-xs font-bold text-gray-500">
+                                  +{items.length - 3}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-gray-800 truncate">{items[0]?.name || 'Order items'}</p>
+                              {items.length > 1 && (
+                                <p className="text-[11px] text-gray-500 truncate">+{items.length - 1} more item{items.length - 1 !== 1 ? 's' : ''}</p>
+                              )}
+                              <p className="text-base font-bold text-[#EE6348] mt-1">${parseFloat(order.total || '0').toFixed(2)}</p>
+                            </div>
+                          </div>
+
+                          {/* Tracking strip */}
+                          {tracking.length > 0 && (
+                            <div className="mx-4 mb-3 flex items-center gap-2 bg-[#EE6348]/5 rounded-xl px-3 py-2">
+                              <Truck size={14} className="text-[#EE6348] shrink-0" />
+                              <span className="text-[11px] text-gray-600 truncate flex-1">
+                                <span className="font-bold text-gray-700">{tracking[0].tracking_provider}</span>
+                                {tracking[0].tracking_number ? ` · ${tracking[0].tracking_number}` : ''}
+                              </span>
+                              {tracking[0].tracking_link && (
+                                <a
+                                  href={tracking[0].tracking_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="shrink-0 text-[11px] font-bold text-[#EE6348] hover:underline"
+                                >
+                                  Track
+                                </a>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Card footer */}
+                          <div className="px-4 pb-3">
+                            <button
+                              onClick={() => setSelectedOrder(order)}
+                              className="w-full bg-[#EE6348] text-white text-sm font-bold py-2.5 rounded-xl hover:bg-black transition active:scale-[0.99]"
+                            >
+                              View Details
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="bg-blue-50 text-blue-700 p-4 rounded text-sm">
-                    No orders found. <span className="font-bold cursor-pointer underline" onClick={() => handleNavigate('shop')}>Go Shop!</span>
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4 text-gray-400">
+                      <Package size={28} />
+                    </div>
+                    <p className="text-sm font-bold text-gray-700 mb-1">No orders yet</p>
+                    <p className="text-xs text-gray-500 mb-4">Your orders will show up here once you place one.</p>
+                    <button
+                      onClick={() => handleNavigate('shop')}
+                      className="bg-[#EE6348] text-white text-sm font-bold px-6 py-2.5 rounded-xl hover:bg-black transition"
+                    >
+                      Start Shopping
+                    </button>
                   </div>
                 )}
+
+                <OrderDetailsModal
+                  order={selectedOrder}
+                  isOpen={!!selectedOrder}
+                  onClose={() => setSelectedOrder(null)}
+                  tracking={selectedOrder ? (orderTracking[selectedOrder.id] || []) : []}
+                />
               </div>
             )}
 
@@ -2819,10 +3039,11 @@ const App: React.FC = () => {
                 <span>${cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toFixed(2)}</span>
               </div>
               <button
-                onClick={() => handleNavigate('checkout')}
-                className="w-full bg-[#EE6348] text-white font-bold uppercase py-3 hover:bg-black transition rounded-sm"
+                onClick={handleExpressCheckout}
+                disabled={expressLoading}
+                className="w-full bg-[#EE6348] text-white font-bold uppercase py-3 hover:bg-black transition rounded-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Checkout
+                {expressLoading ? <><Loader2 size={18} className="animate-spin" /> Redirecting…</> : 'Checkout'}
               </button>
             </div>
           </div>
