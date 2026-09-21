@@ -1427,9 +1427,35 @@ export const api = {
       return null;
     }
   },
+
+  // -----------------------------------------------------------
+  // 7j. Update Customer Address
+  // -----------------------------------------------------------
+  updateCustomerAddress: async (email: string, addressType: 'billing' | 'shipping', address: Record<string, string>) => {
+    try {
+      const customerResponse = await fetch(`${API_BASE}/wc/v3/customers?${getAuthParams()}&email=${encodeURIComponent(email)}`);
+      const customers = await handleResponse(customerResponse);
+      const customer = Array.isArray(customers) ? customers[0] : null;
+
+      if (!customer?.id) {
+        throw new Error('Customer account could not be found. Please register before saving an address.');
+      }
+
+      const response = await fetch(`${API_BASE}/wc/v3/customers/${customer.id}?${getAuthParams()}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [addressType]: address })
+      });
+
+      return await handleResponse(response);
+    } catch (error) {
+      console.error("Failed to update customer address:", error);
+      throw error;
+    }
+  },
   
   // -----------------------------------------------------------
-  // 7j. Register Customer
+  // 7k. Register Customer
   // -----------------------------------------------------------
   registerCustomer: async (customerData: {
     email: string;

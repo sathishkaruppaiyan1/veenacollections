@@ -154,7 +154,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <ul className="space-y-3 text-gray-400">
                 <li className="hover:text-[#EE6348] cursor-pointer transition" onClick={() => onNavigate('page', 'shipping-policy')}>› Shipping Policy</li>
                 <li className="hover:text-[#EE6348] cursor-pointer transition" onClick={() => onNavigate('page', 'refund_returns')}>› Refunds & Returns</li>
-                <li className="hover:text-[#EE6348] cursor-pointer transition" onClick={() => onNavigate('rent')}>› Rental Service</li>
                 <li className="hover:text-[#EE6348] cursor-pointer transition" onClick={() => onNavigate('page', 'privacy-policy')}>› Privacy Policy</li>
                 <li className="hover:text-[#EE6348] cursor-pointer transition" onClick={() => onNavigate('cookie-policy')}>› Cookie Policy</li>
                 <li className="hover:text-[#EE6348] cursor-pointer transition" onClick={() => onNavigate('cookie-policy')}>› Do Not Sell My Info</li>

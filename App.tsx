@@ -360,7 +360,22 @@ const App: React.FC = () => {
       // ignore storage failures (private mode, quota)
     }
   }, [cart]);
-  const [wishlist, setWishlist] = useState<Product[]>([]);
+  const [wishlist, setWishlist] = useState<Product[]>(() => {
+    try {
+      const saved = localStorage.getItem('veena_wishlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('veena_wishlist', JSON.stringify(wishlist));
+    } catch {
+      // ignore storage failures (private mode, quota)
+    }
+  }, [wishlist]);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     const saved = localStorage.getItem('veena_user');
@@ -1336,6 +1351,9 @@ const App: React.FC = () => {
       };
     } | null>(null);
     const [loadingAddresses, setLoadingAddresses] = useState(false);
+    const [editingAddress, setEditingAddress] = useState<'billing' | 'shipping' | null>(null);
+    const [addressForm, setAddressForm] = useState<Record<string, string>>({});
+    const [savingAddress, setSavingAddress] = useState(false);
 
     useEffect(() => {
       if (accountTab === 'orders') {
@@ -1361,6 +1379,44 @@ const App: React.FC = () => {
         api.getCustomerByEmail(user.email).then(setCustomerAddresses).finally(() => setLoadingAddresses(false));
       }
     }, [accountTab, user?.email]);
+
+    const handleEditAddress = (addressType: 'billing' | 'shipping') => {
+      const existingAddress = customerAddresses?.[addressType] || {};
+      setAddressForm({
+        first_name: existingAddress.first_name || '',
+        last_name: existingAddress.last_name || '',
+        company: existingAddress.company || '',
+        address_1: existingAddress.address_1 || '',
+        address_2: existingAddress.address_2 || '',
+        city: existingAddress.city || '',
+        state: existingAddress.state || '',
+        postcode: existingAddress.postcode || '',
+        country: existingAddress.country || '',
+        ...(addressType === 'billing' ? {
+          email: existingAddress.email || user?.email || '',
+          phone: existingAddress.phone || ''
+        } : {})
+      });
+      setEditingAddress(addressType);
+    };
+
+    const handleAddressSubmit = async (event: React.FormEvent) => {
+      event.preventDefault();
+      if (!editingAddress || !user?.email) return;
+
+      setSavingAddress(true);
+      try {
+        await api.updateCustomerAddress(user.email, editingAddress, addressForm);
+        const updatedCustomer = await api.getCustomerByEmail(user.email);
+        setCustomerAddresses(updatedCustomer);
+        setEditingAddress(null);
+        showToast(`${editingAddress === 'billing' ? 'Billing' : 'Shipping'} address updated`);
+      } catch (error) {
+        showToast((error as Error).message || 'Could not update address. Please try again.');
+      } finally {
+        setSavingAddress(false);
+      }
+    };
 
     return (
       <div className="container mx-auto px-4 py-8">
@@ -1547,6 +1603,45 @@ const App: React.FC = () => {
               <div>
                 <h2 className="text-lg font-bold text-gray-800 mb-6">Addresses</h2>
                 <p className="text-gray-600 text-sm mb-6">The following addresses will be used on the checkout page by default.</p>
+                {editingAddress && (
+                  <form onSubmit={handleAddressSubmit} className="border border-[#EE6348]/30 bg-[#EE6348]/5 p-4 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-gray-700">Edit {editingAddress === 'billing' ? 'Billing' : 'Shipping'} Address</h3>
+                      <button type="button" onClick={() => setEditingAddress(null)} className="text-gray-500 hover:text-gray-800" aria-label="Close address form"><X size={18} /></button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        ['first_name', 'First name', true],
+                        ['last_name', 'Last name', true],
+                        ['company', 'Company', false],
+                        ['address_1', 'Address line 1', true],
+                        ['address_2', 'Address line 2', false],
+                        ['city', 'City', true],
+                        ['state', 'State', false],
+                        ['postcode', 'Postcode', true],
+                        ['country', 'Country code', true],
+                        ...(editingAddress === 'billing' ? [['phone', 'Phone', false], ['email', 'Email', true]] : [])
+                      ].map(([field, label, required]) => (
+                        <label key={field as string} className="text-sm text-gray-600">
+                          {label as string}{required ? ' *' : ''}
+                          <input
+                            type={field === 'email' ? 'email' : 'text'}
+                            required={Boolean(required)}
+                            value={addressForm[field as string] || ''}
+                            onChange={(event) => setAddressForm(prev => ({ ...prev, [field as string]: event.target.value }))}
+                            className="w-full border border-gray-300 bg-white p-2 mt-1 focus:outline-none focus:border-[#EE6348]"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex gap-3 mt-4">
+                      <button type="submit" disabled={savingAddress} className="bg-[#EE6348] text-white px-5 py-2 text-sm font-bold hover:bg-black transition disabled:opacity-60">
+                        {savingAddress ? 'Saving...' : 'Save Address'}
+                      </button>
+                      <button type="button" onClick={() => setEditingAddress(null)} className="border border-gray-300 text-gray-600 px-5 py-2 text-sm font-bold hover:bg-gray-100 transition">Cancel</button>
+                    </div>
+                  </form>
+                )}
                 {loadingAddresses ? (
                   <div className="flex justify-center py-8"><Loader2 className="animate-spin text-[#EE6348]" /></div>
                 ) : (
@@ -1554,7 +1649,7 @@ const App: React.FC = () => {
                     <div className="border p-4 rounded bg-gray-50">
                       <h3 className="font-bold text-gray-700 mb-3 flex justify-between items-center">
                         Billing Address
-                        <span className="text-[#EE6348] text-xs cursor-pointer hover:underline">Edit</span>
+                        <button type="button" onClick={() => handleEditAddress('billing')} className="text-[#EE6348] text-xs hover:underline">Edit</button>
                       </h3>
                       {customerAddresses?.billing?.address_1 ? (
                         <div className="text-sm text-gray-600 space-y-1">
@@ -1582,7 +1677,7 @@ const App: React.FC = () => {
                     <div className="border p-4 rounded bg-gray-50">
                       <h3 className="font-bold text-gray-700 mb-3 flex justify-between items-center">
                         Shipping Address
-                        <span className="text-[#EE6348] text-xs cursor-pointer hover:underline">Edit</span>
+                        <button type="button" onClick={() => handleEditAddress('shipping')} className="text-[#EE6348] text-xs hover:underline">Edit</button>
                       </h3>
                       {customerAddresses?.shipping?.address_1 ? (
                         <div className="text-sm text-gray-600 space-y-1">
