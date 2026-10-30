@@ -330,6 +330,13 @@ const getInitialUrlState = () => {
   return { view, param, productId };
 };
 
+// Views are declared inside App so they can close over its state. Rendering them as
+// <ShopView /> gives React a brand-new component type on every App render, which
+// remounts the view and wipes its local state (checkout form, open filter panel...).
+// Calling the view as a render function from a stable module-level component keeps
+// the hooks (and therefore the state) alive across App re-renders.
+const StableView: React.FC<{ render: () => React.ReactNode }> = ({ render }) => <>{render()}</>;
+
 const App: React.FC = () => {
   const initialUrl = getInitialUrlState();
   const [view, setView] = useState<ViewState>(initialUrl.view);
@@ -797,6 +804,7 @@ const App: React.FC = () => {
   // --- Views ---
 
   const [lastOrderId, setLastOrderId] = useState<string>('');
+  const pendingNoticeRef = useRef('');
 
   // Handle the return from Stripe-hosted Checkout: the WordPress plugin redirects
   // back to /?view=thank-you&order_paid=<id> after marking the order paid.
@@ -809,8 +817,25 @@ const App: React.FC = () => {
       setView('thank-you');
       // Strip the query params so a refresh doesn't re-trigger this.
       window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+    // Customer came back from Stripe without paying.
+    const payment = params.get('payment');
+    if (payment === 'cancelled' || payment === 'failed') {
+      // The loading splash hides the toast, so show it once the app has loaded.
+      pendingNoticeRef.current = payment === 'cancelled'
+        ? 'Payment cancelled. Your cart is saved - you can try again.'
+        : 'Payment could not be confirmed. Please try again.';
+      window.history.replaceState({}, '', `${window.location.pathname}?view=checkout`);
     }
   }, []);
+
+  useEffect(() => {
+    if (!loading && pendingNoticeRef.current) {
+      showToast(pendingNoticeRef.current);
+      pendingNoticeRef.current = '';
+    }
+  }, [loading]);
 
   const getPreferredProductDescription = (product: Product): string => {
     const hasMeaningfulHtml = (html?: string) =>
@@ -838,12 +863,16 @@ const App: React.FC = () => {
       last_name: '',
       company: '',
       address_1: '',
+      address_2: '',
       city: '',
+      state: '',
+      postcode: '',
+      country: 'IN',
       phone: '',
       email: ''
     });
 
-    const handleBillingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleBillingChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       setBilling(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
@@ -881,7 +910,7 @@ const App: React.FC = () => {
           setAppliedCoupon({ code: res.code, discountAmount: res.discountAmount });
           setCouponInput('');
         } else {
-          setCouponError(res.message);
+          setCouponError('message' in res ? res.message : 'Invalid coupon.');
         }
       } catch (e) {
         setCouponError((e as Error).message || 'Could not validate coupon.');
@@ -1028,6 +1057,16 @@ const App: React.FC = () => {
                 />
               </div>
               <div>
+                <input
+                  type="text"
+                  name="address_2"
+                  value={billing.address_2}
+                  onChange={handleBillingChange}
+                  className="w-full border p-2 text-sm"
+                  placeholder="Apartment, suite, landmark (optional)"
+                />
+              </div>
+              <div>
                 <label className="block text-sm text-gray-600 mb-1">Town / City *</label>
                 <input
                   type="text"
@@ -1038,6 +1077,49 @@ const App: React.FC = () => {
                   className="w-full border p-2 text-sm"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">State *</label>
+                  <input
+                    type="text"
+                    name="state"
+                    value={billing.state}
+                    onChange={handleBillingChange}
+                    required
+                    className="w-full border p-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">PIN / ZIP Code *</label>
+                  <input
+                    type="text"
+                    name="postcode"
+                    value={billing.postcode}
+                    onChange={handleBillingChange}
+                    required
+                    className="w-full border p-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Country *</label>
+                <select
+                  name="country"
+                  value={billing.country}
+                  onChange={handleBillingChange}
+                  required
+                  className="w-full border p-2 text-sm bg-white"
+                >
+                  <option value="IN">India</option>
+                  <option value="US">United States</option>
+                  <option value="GB">United Kingdom</option>
+                  <option value="CA">Canada</option>
+                  <option value="AU">Australia</option>
+                  <option value="AE">United Arab Emirates</option>
+                  <option value="SG">Singapore</option>
+                  <option value="MY">Malaysia</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Phone *</label>
                 <input
@@ -1046,6 +1128,9 @@ const App: React.FC = () => {
                   value={billing.phone}
                   onChange={handleBillingChange}
                   required
+                  minLength={7}
+                  pattern="[0-9+ \-]{7,}"
+                  title="Enter a valid phone number"
                   className="w-full border p-2 text-sm"
                 />
               </div>
@@ -1609,7 +1694,7 @@ const App: React.FC = () => {
 
   const PageView = () => {
     const [pageData, setPageData] = useState<{ title: string, content: string } | null>(null);
-    const [loadingPage, setLoadingPage] = useState(false);
+    const [loadingPage, setLoadingPage] = useState(true);
 
     useEffect(() => {
       if (currentPageSlug) {
@@ -1735,10 +1820,10 @@ const App: React.FC = () => {
                       <span className="text-[#EE6348] mr-3">›</span> Follow Us
                     </h4>
                     <div className="flex space-x-4">
-                      <a href="#" className="w-12 h-12 bg-black flex items-center justify-center text-white hover:bg-[#EE6348] transition rounded-full shadow-md hover:-translate-y-1">
+                      <a href="https://www.facebook.com/theveenacollections" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="w-12 h-12 bg-black flex items-center justify-center text-white hover:bg-[#EE6348] transition rounded-full shadow-md hover:-translate-y-1">
                         <Facebook size={20} />
                       </a>
-                      <a href="#" className="w-12 h-12 bg-black flex items-center justify-center text-white hover:bg-[#EE6348] transition rounded-full shadow-md hover:-translate-y-1">
+                      <a href="https://www.instagram.com/theveenacollections/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="w-12 h-12 bg-black flex items-center justify-center text-white hover:bg-[#EE6348] transition rounded-full shadow-md hover:-translate-y-1">
                         <Instagram size={20} />
                       </a>
                     </div>
@@ -2433,6 +2518,7 @@ const App: React.FC = () => {
       return categoryProducts
         .filter(p => {
           if (p.price < priceRange[0] || p.price > priceRange[1]) return false;
+          if (!showOutOfStock && p.stock_status === 'outofstock') return false;
           const hasSelectedAttributes = Object.entries(selectedFilterAttributes).every(([attrName, selectedTerms]) => {
             const terms = selectedTerms as string[];
             if (terms.length === 0) return true;
@@ -2454,7 +2540,7 @@ const App: React.FC = () => {
             default: return new Date(b.date_created || 0).getTime() - new Date(a.date_created || 0).getTime();
           }
         });
-    }, [categoryProducts, priceRange, selectedFilterAttributes, sortBy]);
+    }, [categoryProducts, priceRange, selectedFilterAttributes, sortBy, showOutOfStock]);
 
     filteredLengthRef.current = filteredProducts.length;
 
@@ -2462,7 +2548,7 @@ const App: React.FC = () => {
     useEffect(() => {
       setDisplayCount(PAGE_SIZE);
       setIsLoadingMore(false);
-    }, [currentCategory, priceRange, selectedFilterAttributes, sortBy]);
+    }, [currentCategory, priceRange, selectedFilterAttributes, sortBy, showOutOfStock]);
 
     useEffect(() => {
       const el = loadMoreRef.current;
@@ -2510,6 +2596,7 @@ const App: React.FC = () => {
           onCategoryClick={(cat) => handleNavigate('shop', cat)}
           priceRange={priceRange}
           setPriceRange={setPriceRange}
+          minPrice={availablePriceRange.min}
           maxPrice={availablePriceRange.max}
           showOutOfStock={showOutOfStock}
           setShowOutOfStock={setShowOutOfStock}
@@ -3544,20 +3631,21 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1 bg-white">
-        {view === 'home' && <HomeView />}
-        {view === 'shop' && <ShopView />}
+        {view === 'home' && <StableView render={HomeView} />}
+        {view === 'shop' && <StableView render={ShopView} />}
         {view === 'categories' && <CategoriesView />}
-        {view === 'deal' && <DealView />}
-        {view === 'product' && <ProductView />}
+        {view === 'deal' && <StableView render={DealView} />}
+        {view === 'product' && <StableView render={ProductView} />}
         {view === 'cart' && <CartView />}
         {view === 'wishlist' && <WishlistView />}
-        {view === 'checkout' && <CheckoutView />}
-        {view === 'register' && <RegisterView />}
-        {view === 'account' && <AccountView />}
-        {view === 'page' && <PageView />}
-        {view === 'track-order' && <TrackOrderView />}
+        {view === 'checkout' && <StableView render={CheckoutView} />}
+        {view === 'register' && <StableView render={RegisterView} />}
+        {view === 'account' && <StableView render={AccountView} />}
+        {view === 'page' && <StableView render={PageView} />}
+        {view === 'track-order' && <StableView render={TrackOrderView} />}
+        {view === 'rent' && <StableView render={RentMeView} />}
         {view === 'cookie-policy' && <CookiePolicy onBack={() => handleNavigate('home')} />}
-        {view === 'thank-you' && <ThankYouView />}
+        {view === 'thank-you' && <StableView render={ThankYouView} />}
       </main>
 
       <Footer onNavigate={handleNavigate} />

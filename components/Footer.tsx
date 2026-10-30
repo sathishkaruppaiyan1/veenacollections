@@ -200,7 +200,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <div className="flex space-x-2">
                 <div className="bg-black px-2 py-1 rounded"><span className="font-bold italic">VISA</span></div>
                 <div className="bg-black px-2 py-1 rounded"><span className="font-bold">MasterCard</span></div>
-                <div className="bg-black px-2 py-1 rounded"><span className="font-bold text-blue-400 italic">PayPal</span></div>
               </div>
             </div>
           </div>
@@ -210,7 +209,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
       {/* Copyright */}
       <div className="bg-[#0b141b] py-6 border-t border-gray-800 text-xs text-gray-500">
         <div className="container mx-auto px-4 text-center">
-          <p>© 2025 Veena Collections. All Rights Reserved. Design By <a href="https://sathishkaruppaiyan.in" target="_blank" rel="noopener noreferrer" className="text-[#EE6348] hover:text-white transition">Sathish Karuppaiyan</a></p>
+          <p>© {new Date().getFullYear()} Veena Collections. All Rights Reserved. Design By <a href="https://sathishkaruppaiyan.in" target="_blank" rel="noopener noreferrer" className="text-[#EE6348] hover:text-white transition">Sathish Karuppaiyan</a></p>
         </div>
       </div>
     </footer>

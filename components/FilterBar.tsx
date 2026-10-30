@@ -12,6 +12,7 @@ interface FilterBarProps {
     onCategoryClick: (category: string) => void;
     priceRange: [number, number];
     setPriceRange: (range: [number, number]) => void;
+    minPrice?: number;
     maxPrice?: number;
     showOutOfStock: boolean;
     setShowOutOfStock: (show: boolean) => void;
@@ -22,11 +23,29 @@ interface FilterBarProps {
     endContent?: React.ReactNode;
 }
 
+// Build price presets from the real price range (e.g. Under $25, $25 - $50, ...).
+const buildPriceBuckets = (min: number, max: number): Array<{ label: string; range: [number, number] }> => {
+    const span = max - min;
+    if (span <= 0) return [];
+    const step = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000]
+        .find(n => Math.ceil(max / n) <= 4) ?? 50000;
+    const buckets: Array<{ label: string; range: [number, number] }> = [];
+    for (let lo = 0; lo < max; lo += step) {
+        const hi = lo + step;
+        if (hi <= min) continue; // nothing priced in this bucket
+        if (lo === 0) buckets.push({ label: `Under $${hi}`, range: [min, Math.min(hi, max)] });
+        else if (hi >= max) buckets.push({ label: `$${lo}+`, range: [Math.max(lo, min), max] });
+        else buckets.push({ label: `$${lo} - $${hi}`, range: [Math.max(lo, min), hi] });
+    }
+    return buckets;
+};
+
 export const FilterBar: React.FC<FilterBarProps> = ({
     categories,
     onCategoryClick,
     priceRange,
     setPriceRange,
+    minPrice = 0,
     maxPrice = 1000,
     showOutOfStock,
     setShowOutOfStock,
@@ -47,8 +66,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         setExpandedSections(prev => ({ ...prev, [name]: !prev[name] }));
     };
 
-    const activeFilterCount = Object.values(selectedAttributes).reduce((sum, v) => sum + (v as string[]).length, 0)
-        + (priceRange[0] > 0 || priceRange[1] < maxPrice ? 1 : 0)
+    const activeFilterCount = Object.values(selectedAttributes).reduce<number>((sum, v) => sum + (v as string[]).length, 0)
+        + (priceRange[0] > minPrice || priceRange[1] < maxPrice ? 1 : 0)
         + (showOutOfStock ? 1 : 0);
 
     return (
@@ -74,12 +93,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
             {/* Overlay */}
             <div
-                className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                className={`fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                 onClick={() => setIsOpen(false)}
             />
 
             {/* Offcanvas Sidebar */}
-            <div className={`fixed top-0 left-0 z-[70] h-full w-[320px] max-w-[85vw] bg-white shadow-2xl transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className={`fixed top-0 left-0 z-[120] h-full w-[320px] max-w-[85vw] bg-white shadow-2xl transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
 
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-[#0f1f2e] text-white">
@@ -138,25 +157,49 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                                     <span>${priceRange[0]}</span>
                                     <span>${priceRange[1]}</span>
                                 </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max={maxPrice}
-                                    value={priceRange[1]}
-                                    onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
-                                    className="w-full accent-[#EE6348] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                />
+                                <div className="space-y-3">
+                                    <label className="block text-[11px] uppercase tracking-wider text-gray-400">
+                                        Min
+                                        <input
+                                            type="range"
+                                            min={minPrice}
+                                            max={maxPrice}
+                                            value={priceRange[0]}
+                                            onChange={(e) => setPriceRange([Math.min(parseInt(e.target.value), priceRange[1]), priceRange[1]])}
+                                            className="w-full accent-[#EE6348] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                    </label>
+                                    <label className="block text-[11px] uppercase tracking-wider text-gray-400">
+                                        Max
+                                        <input
+                                            type="range"
+                                            min={minPrice}
+                                            max={maxPrice}
+                                            value={priceRange[1]}
+                                            onChange={(e) => setPriceRange([priceRange[0], Math.max(parseInt(e.target.value), priceRange[0])])}
+                                            className="w-full accent-[#EE6348] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                    </label>
+                                </div>
                                 <div className="flex flex-wrap gap-2 mt-4">
-                                    {maxPrice >= 50 && (
-                                        <button onClick={() => setPriceRange([0, 50])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">Under $50</button>
-                                    )}
-                                    {maxPrice >= 200 && (
-                                        <button onClick={() => setPriceRange([50, 200])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">$50 - $200</button>
-                                    )}
-                                    {maxPrice > 200 && (
-                                        <button onClick={() => setPriceRange([200, maxPrice])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">$200+</button>
-                                    )}
-                                    <button onClick={() => setPriceRange([0, maxPrice])} className="text-xs border px-3 py-1.5 rounded hover:border-[#EE6348] hover:text-[#EE6348] transition">All Prices</button>
+                                    {buildPriceBuckets(minPrice, maxPrice).map(bucket => {
+                                        const active = priceRange[0] === bucket.range[0] && priceRange[1] === bucket.range[1];
+                                        return (
+                                            <button
+                                                key={bucket.label}
+                                                onClick={() => setPriceRange(bucket.range)}
+                                                className={`text-xs border px-3 py-1.5 rounded transition ${active ? 'border-[#EE6348] text-[#EE6348] bg-orange-50' : 'hover:border-[#EE6348] hover:text-[#EE6348]'}`}
+                                            >
+                                                {bucket.label}
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        onClick={() => setPriceRange([minPrice, maxPrice])}
+                                        className={`text-xs border px-3 py-1.5 rounded transition ${priceRange[0] === minPrice && priceRange[1] === maxPrice ? 'border-[#EE6348] text-[#EE6348] bg-orange-50' : 'hover:border-[#EE6348] hover:text-[#EE6348]'}`}
+                                    >
+                                        All Prices
+                                    </button>
                                 </div>
                             </div>
                         )}

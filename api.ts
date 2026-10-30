@@ -344,6 +344,7 @@ export const api = {
         const images = mapProductImages(item);
         return {
           id: item.id,
+          date_created: item.date_created,
           name: item.name,
           slug: item.slug,
           permalink: item.permalink,
@@ -1201,7 +1202,11 @@ export const api = {
       last_name: string;
       company?: string;
       address_1: string;
+      address_2?: string;
       city: string;
+      state?: string;
+      postcode?: string;
+      country?: string;
       phone: string;
       email: string;
     };
@@ -1237,6 +1242,11 @@ export const api = {
         body: JSON.stringify({
           ...orderData,
           billing: cleanBilling,
+          // Deliver to the same address; Stripe overwrites this with the address
+          // the customer confirms on its hosted page.
+          shipping: Object.fromEntries(
+            Object.entries(cleanBilling).filter(([k]) => k !== 'email' && k !== 'phone')
+          ),
           set_paid: false,
           status: isCod ? 'processing' : 'pending'
         }),
