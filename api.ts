@@ -183,6 +183,13 @@ const mapOrder = (o: any): Order => ({
   shipping_total: o.shipping_total,
   discount_total: o.discount_total,
   total_tax: o.total_tax,
+  tax_lines: (o.tax_lines || [])
+    .map((t: any) => ({
+      label: t.label || t.rate_code || 'Tax',
+      amount: String(parseFloat(t.tax_total || '0') + parseFloat(t.shipping_tax_total || '0')),
+      rate: t.rate_percent != null ? Number(t.rate_percent) : undefined
+    }))
+    .filter((t: any) => parseFloat(t.amount) > 0),
   line_items: (o.line_items || []).map((li: any) => ({
     id: li.id,
     name: li.name,
@@ -238,7 +245,7 @@ export const api = {
           allProducts = [...allProducts, ...data];
           // Check if there are more pages (from response headers)
           const totalPages = response.headers.get('X-WP-TotalPages');
-          if (totalPages && page >= parseInt(totalPages)) {
+          if ((totalPages && page >= parseInt(totalPages)) || data.length < 100) {
             hasMore = false;
           } else {
             page++;
@@ -251,11 +258,6 @@ export const api = {
       // Map WooCommerce Data to App Interface
       return allProducts.map((item: any) => {
         const images = mapProductImages(item);
-        console.log('Product descriptions:', {
-          name: item.name,
-          short_description: item.short_description,
-          description: item.description
-        });
         
         return {
           id: item.id,
@@ -283,8 +285,9 @@ export const api = {
       });
 
     } catch (error) {
-      console.error("Failed to fetch products from API, using fallback:", error);
-      return MOCK_PRODUCTS;
+      // Do NOT fall back to sample products here: customers would see (and try to buy) items that don't exist.
+      console.error("Failed to fetch products from API:", error);
+      return [];
     }
   },
 
@@ -466,7 +469,7 @@ export const api = {
     } catch (error) {
       console.error("Failed to fetch deal products:", error);
       return {
-        products: MOCK_PRODUCTS.slice(0, 3),
+        products: [],
         saleEndDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
       };
     }
@@ -673,11 +676,10 @@ export const api = {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return [];
 
-      const response = await wcFetch(`${API_BASE}/wc/v3/products/${productId}/variations?${getAuthParams()}`);
+      const response = await wcFetch(`${API_BASE}/wc/v3/products/${productId}/variations?${getAuthParams()}&per_page=100`);
       const data = await handleResponse(response);
 
       return data.map((v: any) => {
-        console.log('Variation stock data:', { id: v.id, manage_stock: v.manage_stock, stock_quantity: v.stock_quantity, stock_status: v.stock_status, attributes: v.attributes });
         return {
           id: v.id,
           price: parseFloat(v.price),
@@ -730,7 +732,7 @@ export const api = {
         return { name: 'VEENA COLLECTIONS', description: 'Traditional & Modern' };
       }
 
-      const response = await fetch(API_BASE); // Public index usually returns site info
+      const response = await fetch(`${API_BASE}?_fields=name,description`); // tiny response instead of the 1.2 MB index
       const data = await response.json();
       return {
         name: data.name || 'VEENA COLLECTIONS',
@@ -752,20 +754,6 @@ export const api = {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return KNOWN_LOGO;
 
-      const response = await fetch(`${API_BASE}/wp/v2/settings?${getAuthParams()}`);
-
-      if (response.ok) {
-        const settings = await response.json();
-        const logoId = settings.site_logo;
-
-        if (logoId) {
-          const mediaResponse = await fetch(`${API_BASE}/wp/v2/media/${logoId}`);
-          if (mediaResponse.ok) {
-            const media = await mediaResponse.json();
-            return media.source_url || KNOWN_LOGO;
-          }
-        }
-      }
       return KNOWN_LOGO;
     } catch (error) {
       console.warn("Could not fetch site logo, using default:", error);
@@ -875,19 +863,9 @@ export const api = {
       const email = customerEmail.toLowerCase();
       let query = `per_page=20&orderby=date&order=desc`;
 
-      // Registered customers can be filtered server-side by customer id
-      const customerRes = await fetch(`${API_BASE}/wc/v3/customers?${getAuthParams()}&email=${encodeURIComponent(customerEmail)}`);
-      if (customerRes.ok) {
-        const customers = await customerRes.json();
-        if (Array.isArray(customers) && customers[0]?.id) {
-          query += `&customer=${customers[0].id}`;
-        } else {
-          // Guest checkout: fall back to Woo's billing search
-          query += `&search=${encodeURIComponent(customerEmail)}`;
-        }
-      } else {
-        query += `&search=${encodeURIComponent(customerEmail)}`;
-      }
+      // Search by billing email. Orders placed through Stripe checkout may be guest
+      // orders (customer id 0), so filtering by customer id would hide them.
+      query += `&search=${encodeURIComponent(customerEmail)}`;
 
       const response = await fetch(`${API_BASE}/wc/v3/orders?${getAuthParams()}&${query}`);
       const data = await handleResponse(response);
@@ -1215,6 +1193,17 @@ export const api = {
       quantity: number;
       variation_id?: number;
     }>;
+    shipping?: {
+      first_name: string;
+      last_name: string;
+      company?: string;
+      address_1: string;
+      address_2?: string;
+      city: string;
+      state?: string;
+      postcode?: string;
+      country?: string;
+    };
     payment_method: string;
     payment_method_title: string;
     coupon_lines?: Array<{ code: string }>;
@@ -1242,10 +1231,9 @@ export const api = {
         body: JSON.stringify({
           ...orderData,
           billing: cleanBilling,
-          // Deliver to the same address; Stripe overwrites this with the address
-          // the customer confirms on its hosted page.
+          // Deliver to the separate shipping address if given, otherwise to the billing address.
           shipping: Object.fromEntries(
-            Object.entries(cleanBilling).filter(([k]) => k !== 'email' && k !== 'phone')
+            Object.entries(orderData.shipping ?? cleanBilling).filter(([k, v]) => k !== 'email' && k !== 'phone' && v !== '' && v != null)
           ),
           set_paid: false,
           status: isCod ? 'processing' : 'pending'
@@ -1276,9 +1264,51 @@ export const api = {
     );
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.url) {
-      throw new Error(data.error || 'Failed to start Stripe checkout');
+      const err = new Error(data.error || 'Failed to start Stripe checkout') as Error & { code?: string };
+      err.code = data.code;
+      throw err;
     }
     return data.url as string;
+  },
+
+  // -----------------------------------------------------------
+  // 7e-c. Fresh stock for cart items (stock changes while customers shop)
+  // Returns max purchasable qty per item: 0 = sold out, null = unlimited.
+  // Key is "productId" or "productId:variationId".
+  // -----------------------------------------------------------
+  getFreshStock: async (items: Array<{ id: number; variationId?: number }>): Promise<Record<string, number | null>> => {
+    const result: Record<string, number | null> = {};
+    if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) return result;
+    const maxOf = (r: any): number | null => {
+      if (!r) return null;
+      if (r.stock_status === 'outofstock') return 0;
+      if (r.backorders_allowed) return null;
+      if (r.manage_stock === true && r.stock_quantity != null) return Math.max(0, r.stock_quantity);
+      return undefined as any; // not decided here
+    };
+    await Promise.all(items.map(async (it) => {
+      const key = it.variationId ? `${it.id}:${it.variationId}` : `${it.id}`;
+      try {
+        const prodRes = await fetch(`${API_BASE}/wc/v3/products/${it.id}?${getAuthParams()}`);
+        if (!prodRes.ok) return; // unknown -> leave the cart as is
+        const prod = await prodRes.json();
+        let varData: any = null;
+        if (it.variationId) {
+          const vRes = await fetch(`${API_BASE}/wc/v3/products/${it.id}/variations/${it.variationId}?${getAuthParams()}`);
+          if (vRes.ok) varData = await vRes.json();
+        }
+        const fromVar = varData ? maxOf(varData) : undefined;
+        const fromProd = maxOf(prod);
+        // Variation wins when it decides (own stock or out of stock); otherwise the product (parent stock) does.
+        if (prod.status && prod.status !== 'publish') result[key] = 0;
+        else if (fromVar !== undefined) result[key] = fromVar;
+        else if (fromProd !== undefined) result[key] = fromProd;
+        else result[key] = null;
+      } catch {
+        // network hiccup: don't block the customer on a failed stock lookup
+      }
+    }));
+    return result;
   },
 
   // -----------------------------------------------------------
@@ -1415,7 +1445,7 @@ export const api = {
         return null;
       }
 
-      const response = await fetch(`${API_BASE}/wc/v3/customers?${getAuthParams()}&email=${encodeURIComponent(email)}`);
+      const response = await fetch(`${API_BASE}/wc/v3/customers?${getAuthParams()}&email=${encodeURIComponent(email)}&role=all`);
 
       if (!response.ok) {
         return null;
@@ -1443,7 +1473,7 @@ export const api = {
   // -----------------------------------------------------------
   updateCustomerAddress: async (email: string, addressType: 'billing' | 'shipping', address: Record<string, string>) => {
     try {
-      const customerResponse = await fetch(`${API_BASE}/wc/v3/customers?${getAuthParams()}&email=${encodeURIComponent(email)}`);
+      const customerResponse = await fetch(`${API_BASE}/wc/v3/customers?${getAuthParams()}&email=${encodeURIComponent(email)}&role=all`);
       const customers = await handleResponse(customerResponse);
       const customer = Array.isArray(customers) ? customers[0] : null;
 

@@ -227,7 +227,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, isO
             <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Payment summary</p>
             <div className="space-y-2 text-sm">
               {order.subtotal && (
-                <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{money(order.subtotal)}</span></div>
+                <div className="flex justify-between text-gray-600"><span>Subtotal (excl. tax)</span><span>{money(order.subtotal)}</span></div>
               )}
               {discount > 0 && (
                 <div className="flex justify-between text-green-600"><span>Discount</span><span>-{money(discount)}</span></div>
@@ -236,8 +236,14 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, isO
                 <span>Shipping{order.shipping_method ? ` (${order.shipping_method})` : ''}</span>
                 <span>{shippingCost > 0 ? money(shippingCost) : 'Free'}</span>
               </div>
-              {tax > 0 && (
-                <div className="flex justify-between text-gray-600"><span>Tax</span><span>{money(tax)}</span></div>
+              {tax > 0 && (order.tax_lines && order.tax_lines.length > 0
+                ? order.tax_lines.map((t, i) => (
+                    <div key={i} className="flex justify-between text-gray-600"><span>{t.label}</span><span>{money(t.amount)}</span></div>
+                  ))
+                : <div className="flex justify-between text-gray-600"><span>Tax</span><span>{money(tax)}</span></div>
+              )}
+              {tax <= 0 && (
+                <div className="flex justify-between text-gray-600"><span>Sales tax</span><span>{money(0)}</span></div>
               )}
               <div className="flex justify-between pt-2 border-t border-gray-100 text-base font-bold text-gray-900">
                 <span>Total</span><span className="text-[#EE6348]">{money(order.total)}</span>

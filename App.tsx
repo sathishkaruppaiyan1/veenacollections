@@ -11,6 +11,8 @@ import { CookieConsent } from './components/CookieConsent';
 import { CookiePolicy } from './components/CookiePolicy';
 import { OrderDetailsModal, statusStyles } from './components/OrderDetailsModal';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
+import { sortSizeOptions } from './sizeOrder';
+import { calcSalesTax, TAX_LABEL, TAX_RATE_PERCENT, US_STATES, SHIP_COUNTRIES } from './tax';
 import { api } from './api';
 import { Product, ViewState, CartItem, Category, NavItem, Variation, Order, HomeHeroBanner, HomeReel } from './types';
 import { ArrowRight, ArrowLeft, Plus, Minus, X, Check, Home, Star, ShoppingCart, Heart, Loader2, UserCircle2, Package, MapPin, LogOut, CreditCard, Quote, Tag, Truck, Phone, Mail, Play, Facebook, Instagram } from 'lucide-react';
@@ -330,6 +332,20 @@ const getInitialUrlState = () => {
   return { view, param, productId };
 };
 
+// Declared outside App so it is not torn down and rebuilt on every App update.
+// How long a toast stays on screen.
+const TOAST_MS = 1000;
+
+const Toast = ({ message, visible }: { message: string, visible: boolean }) => {
+  if (!visible) return null;
+  return (
+    <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-4 rounded shadow-2xl z-[100] animate-fade-in-down flex items-center max-w-sm">
+      <Check size={20} className="mr-3 flex-shrink-0" />
+      <span className="text-sm font-semibold">{message}</span>
+    </div>
+  );
+};
+
 // Views are declared inside App so they can close over its state. Rendering them as
 // <ShopView /> gives React a brand-new component type on every App render, which
 // remounts the view and wipes its local state (checkout form, open filter panel...).
@@ -427,6 +443,9 @@ const App: React.FC = () => {
   const [siteLogo, setSiteLogo] = useState<string | null>(DEFAULT_LOGO);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Per-size stock for the shop's size filter: productId -> variations (null = could not be loaded).
+  const variationStockCache = useRef<Record<number, Variation[] | null>>({});
+
   // Variation States
   const [variations, setVariations] = useState<Variation[]>([]);
   const [variationLoading, setVariationLoading] = useState<boolean>(false);
@@ -437,15 +456,18 @@ const App: React.FC = () => {
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
   // Initial Data Fetch
+  const [loadError, setLoadError] = useState(false);
+  const [dataKey, setDataKey] = useState(0);
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
+      setLoadError(false);
       try {
-        const [fetchedProducts, fetchedBestSellers, fetchedCategories, fetchedMenu, fetchedInfo, fetchedLogo, fetchedAttrs] = await Promise.all([
+        // The header menu is hard-coded, so the WordPress menu is not requested at all.
+        const [fetchedProducts, fetchedBestSellers, fetchedCategories, fetchedInfo, fetchedLogo, fetchedAttrs] = await Promise.all([
           api.getProducts(),
           api.getBestSellerProducts(),
           api.getCategories(),
-          api.getMenu(),
           api.getSiteInfo(),
           api.getSiteLogo(),
           api.getAttributes()
@@ -453,25 +475,26 @@ const App: React.FC = () => {
         setProducts(fetchedProducts);
         setBestSellerProducts(fetchedBestSellers);
         setCategories(fetchedCategories);
-        setMenuItems(fetchedMenu);
         setSiteInfo(fetchedInfo);
         setSiteLogo(fetchedLogo || DEFAULT_LOGO);
+        if (fetchedProducts.length === 0) setLoadError(true);
+        setLoading(false); // show the store now; filter options can arrive afterwards
 
-        // Fetch terms for each attribute
+        // Attribute terms (size, colour...) are only needed by the filter panel.
         const attrsWithTerms = await Promise.all(fetchedAttrs.map(async (attr) => {
           const terms = await api.getAttributeTerms(attr.id);
           return { ...attr, terms };
         }));
         setProductAttributes(attrsWithTerms);
-
       } catch (error) {
         console.error("Error loading data:", error);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
     };
     loadData();
-  }, []);
+  }, [dataKey]);
 
   // On first mount, seed history.state so back/forward works after a hard refresh.
   useEffect(() => {
@@ -561,24 +584,16 @@ const App: React.FC = () => {
         }
       });
 
-      // If variable product, fetch variations
-      if (prod.type === 'variable') {
-        setVariationLoading(true);
-        try {
-          const vars = await api.getProductVariations(prod.id);
-          setVariations(vars);
-        } catch (e) {
-          console.error("Error fetching variations", e);
-        } finally {
-          setVariationLoading(false);
-        }
-      }
     }
   };
 
+  // One timer for all toasts: a new message cancels the previous hide-timer, so quick
+  // repeated actions (add, add, add) never cut the latest message short.
+  const toastTimerRef = useRef<number | undefined>(undefined);
   const showToast = (message: string) => {
+    window.clearTimeout(toastTimerRef.current);
     setToast({ message, visible: true });
-    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+    toastTimerRef.current = window.setTimeout(() => setToast(prev => ({ ...prev, visible: false })), TOAST_MS);
   };
 
   // ── Stock helpers ──────────────────────────────────────────
@@ -606,17 +621,22 @@ const App: React.FC = () => {
   };
 
   // ── Cart functions (fresh) ───────────────────────────────
-  const addToCart = (product: Product, opts?: { variation?: Variation | null; selectedAttributes?: Record<string, string>; quantity?: number }) => {
+  const addToCart = (product: Product, opts?: { variation?: Variation | null; selectedAttributes?: Record<string, string>; quantity?: number }): boolean => {
     const useVariation = opts?.variation !== undefined ? opts.variation : currentVariation;
     const useSelected = opts?.selectedAttributes !== undefined ? opts.selectedAttributes : selectedAttributes;
     const qtyToAdd = opts?.quantity || 1;
 
     if (product.type === 'variable' && !useVariation) {
       showToast('Please select all options before adding to cart');
-      return;
+      return false;
     }
 
     const maxQty = resolveMaxQty(product, useVariation);
+
+    if (maxQty !== null && maxQty <= 0) {
+      showToast(`${product.name} is out of stock`);
+      return false;
+    }
 
     const itemToAdd: CartItem = {
       ...product,
@@ -628,33 +648,27 @@ const App: React.FC = () => {
       maxQty,
     };
 
+    const existingInCart = cart.find(i => i.id === itemToAdd.id && i.variationId === itemToAdd.variationId);
+    const wanted = (existingInCart ? existingInCart.quantity : 0) + qtyToAdd;
+
     setCart(prev => {
       const existing = prev.find(i => i.id === itemToAdd.id && i.variationId === itemToAdd.variationId);
-
       if (existing) {
-        let newQty = existing.quantity + qtyToAdd;
-        if (maxQty !== null && newQty > maxQty) {
-          newQty = maxQty;
-          showToast(`Only ${maxQty} available in stock`);
-        }
+        const q = maxQty !== null ? Math.min(existing.quantity + qtyToAdd, maxQty) : existing.quantity + qtyToAdd;
         return prev.map(i =>
-          i.id === itemToAdd.id && i.variationId === itemToAdd.variationId
-            ? { ...i, quantity: newQty }
-            : i
+          i.id === itemToAdd.id && i.variationId === itemToAdd.variationId ? { ...i, quantity: q } : i
         );
       }
-
-      let finalQty = qtyToAdd;
-      if (maxQty !== null && finalQty > maxQty) {
-        finalQty = maxQty;
-        showToast(`Only ${maxQty} available in stock`);
-      }
-      return [...prev, { ...itemToAdd, quantity: finalQty }];
+      const q = maxQty !== null ? Math.min(qtyToAdd, maxQty) : qtyToAdd;
+      return [...prev, { ...itemToAdd, quantity: q }];
     });
 
-    if (maxQty === null || qtyToAdd <= maxQty) {
+    if (maxQty !== null && wanted > maxQty) {
+      showToast(`Only ${maxQty} available in stock`);
+    } else {
       showToast(`Added ${product.name} to cart`);
     }
+    return true;
   };
 
   const removeFromCart = (id: number, variationId?: number) => {
@@ -695,6 +709,37 @@ const App: React.FC = () => {
     );
   };
 
+  // Re-check every cart item against live stock. Fixes quantities / removes sold-out
+  // items and returns the messages to show. Stock can change at any moment because
+  // other customers are buying the same items.
+  const revalidateCartStock = async (): Promise<string[]> => {
+    if (cart.length === 0) return [];
+    const fresh = await api.getFreshStock(cart.map(i => ({ id: i.id, variationId: i.variationId })));
+    const messages: string[] = [];
+    const next: CartItem[] = [];
+    for (const item of cart) {
+      const key = item.variationId ? `${item.id}:${item.variationId}` : `${item.id}`;
+      if (!(key in fresh)) { next.push(item); continue; } // lookup failed: keep as is
+      const max = fresh[key];
+      if (max === 0) { messages.push(`"${item.name}" just sold out and was removed from your cart.`); continue; }
+      if (max !== null && item.quantity > max) {
+        messages.push(`Only ${max} of "${item.name}" left - quantity reduced.`);
+        next.push({ ...item, quantity: max, maxQty: max });
+        continue;
+      }
+      next.push(item.maxQty === max ? item : { ...item, maxQty: max });
+    }
+    if (messages.length > 0 || next.some((it, i) => it.maxQty !== cart[i]?.maxQty)) setCart(next);
+    return messages;
+  };
+
+  // Keep the cart honest whenever the customer opens the cart or checkout page.
+  useEffect(() => {
+    if ((view === 'cart' || view === 'checkout') && cart.length > 0) {
+      revalidateCartStock().then(msgs => { if (msgs.length) showToast(msgs[0]); });
+    }
+  }, [view]);
+
   // Express checkout: cart -> Stripe directly, skipping the on-site billing form.
   // Stripe Checkout collects the email/address; the WP snippet writes it back to
   // the order on return. (The full billing form still exists in CheckoutView and
@@ -704,6 +749,8 @@ const App: React.FC = () => {
     if (cart.length === 0) { showToast('Your cart is empty'); return; }
     setExpressLoading(true);
     try {
+      const stockIssues = await revalidateCartStock();
+      if (stockIssues.length) { showToast(stockIssues[0]); setExpressLoading(false); return; }
       const nameParts = (user?.name || '').trim().split(' ');
       const order = await api.createOrder({
         billing: {
@@ -727,28 +774,47 @@ const App: React.FC = () => {
       window.location.href = stripeUrl;
     } catch (error) {
       console.error('Express checkout failed:', error);
-      showToast('Could not start checkout. Please try again.');
+      if ((error as any)?.code === 'out_of_stock') {
+        showToast((error as Error).message);
+        revalidateCartStock();
+      } else {
+        showToast('Could not start checkout. Please try again.');
+      }
       setExpressLoading(false);
     }
   };
 
   const toggleWishlist = (product: Product) => {
-    setWishlist(prev => {
-      const exists = prev.find(p => p.id === product.id);
-      if (exists) {
-        showToast("Removed from Wishlist");
-        return prev.filter(p => p.id !== product.id);
-      }
-      showToast("Added to Wishlist");
-      return [...prev, product];
-    });
+    const exists = wishlist.some(p => p.id === product.id);
+    setWishlist(prev => prev.some(p => p.id === product.id)
+      ? prev.filter(p => p.id !== product.id)
+      : [...prev, product]);
+    showToast(exists ? "Removed from Wishlist" : "Added to Wishlist");
   };
+
+  const removeFromWishlist = (id: number) => setWishlist(prev => prev.filter(p => p.id !== id));
 
   const isInWishlist = (id: number) => wishlist.some(p => p.id === id);
 
   const handleQuickView = (product: Product) => {
     setQuickViewProduct(product);
   };
+
+  // Load variations whenever the active product changes. Doing it here (not only in
+  // handleProductClick) covers page refresh, shared links and the browser Back button.
+  useEffect(() => {
+    setVariations([]);
+    setSelectedAttributes({});
+    setCurrentVariation(null);
+    if (!activeProduct || activeProduct.type !== 'variable') return;
+    let cancelled = false;
+    setVariationLoading(true);
+    api.getProductVariations(activeProduct.id)
+      .then(vars => { if (!cancelled) setVariations(vars); })
+      .catch(e => console.error("Error fetching variations", e))
+      .finally(() => { if (!cancelled) setVariationLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeProduct?.id]);
 
   // Logic to find matching variation based on currently selected attributes
   useEffect(() => {
@@ -882,18 +948,92 @@ const App: React.FC = () => {
       city: '',
       state: '',
       postcode: '',
-      country: 'IN',
+      country: 'US',
       phone: '',
       email: ''
     });
 
+    // Delivery address: same as billing unless the customer unticks the box.
+    const [shipSame, setShipSame] = useState(true);
+    const [shipping, setShipping] = useState({
+      first_name: '', last_name: '', company: '', address_1: '', address_2: '',
+      city: '', state: '', postcode: '', country: 'US'
+    });
+
+    // US states are a fixed list (codes), so changing country clears a state that no longer fits.
     const handleBillingChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      setBilling(prev => ({ ...prev, [e.target.name]: e.target.value }));
+      const { name, value } = e.target;
+      setBilling(prev => ({ ...prev, [name]: value, ...(name === 'country' ? { state: '' } : {}) }));
     };
+    const handleShippingChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const { name, value } = e.target;
+      setShipping(prev => ({ ...prev, [name]: value, ...(name === 'country' ? { state: '' } : {}) }));
+    };
+
+    // One set of address fields, used for both billing and shipping.
+    const renderAddressFields = (
+      v: { first_name: string; last_name: string; company: string; address_1: string; address_2: string; city: string; state: string; postcode: string; country: string },
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void
+    ) => (
+      <>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">First Name *</label>
+            <input type="text" name="first_name" value={v.first_name} onChange={onChange} required className="w-full border p-2 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Last Name *</label>
+            <input type="text" name="last_name" value={v.last_name} onChange={onChange} required className="w-full border p-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">Company Name</label>
+          <input type="text" name="company" value={v.company} onChange={onChange} className="w-full border p-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">Street Address *</label>
+          <input type="text" name="address_1" value={v.address_1} onChange={onChange} required className="w-full border p-2 text-sm" placeholder="House number and street name" />
+        </div>
+        <div>
+          <input type="text" name="address_2" value={v.address_2} onChange={onChange} className="w-full border p-2 text-sm" placeholder="Apartment, suite, landmark (optional)" />
+        </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">Town / City *</label>
+          <input type="text" name="city" value={v.city} onChange={onChange} required className="w-full border p-2 text-sm" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">State *</label>
+            {v.country === 'US' ? (
+              <select name="state" value={v.state} onChange={onChange} required className="w-full border p-2 text-sm bg-white">
+                <option value="">Select state</option>
+                {US_STATES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+              </select>
+            ) : (
+              <input type="text" name="state" value={v.state} onChange={onChange} required className="w-full border p-2 text-sm" />
+            )}
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">{v.country === 'US' ? 'ZIP Code *' : 'PIN / ZIP Code *'}</label>
+            <input type="text" name="postcode" value={v.postcode} onChange={onChange} required className="w-full border p-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">Country *</label>
+          <select name="country" value={v.country} onChange={onChange} required className="w-full border p-2 text-sm bg-white">
+            {SHIP_COUNTRIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+          </select>
+        </div>
+      </>
+    );
 
     const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
     const discount = appliedCoupon ? Math.min(appliedCoupon.discountAmount, subtotal) : 0;
-    const total = Math.max(0, subtotal - discount);
+    const taxableAmount = Math.max(0, subtotal - discount);
+    // Prices exclude tax: 7.75% is added on top, for California deliveries only.
+    const delivery = shipSame ? billing : shipping;
+    const salesTax = calcSalesTax(taxableAmount, delivery.country, delivery.state);
+    const total = taxableAmount + salesTax;
 
     // Fetch payment gateways
     useEffect(() => {
@@ -944,20 +1084,26 @@ const App: React.FC = () => {
       setOrderError('');
 
       if (!selectedPayment) {
-        setToast({ message: "Please select a payment method", visible: true });
-        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+        showToast("Please select a payment method");
         return;
       }
 
       if (cart.length === 0) {
-        setToast({ message: "Your cart is empty", visible: true });
-        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+        showToast("Your cart is empty");
         return;
       }
 
       setPlacingOrder(true);
 
       try {
+        const stockIssues = await revalidateCartStock();
+        if (stockIssues.length) {
+          setOrderError(stockIssues.join(' '));
+          showToast(stockIssues[0]);
+          setPlacingOrder(false);
+          return;
+        }
+
         // Get payment method title
         const paymentMethod = paymentGateways.find(g => g.id === selectedPayment);
 
@@ -967,6 +1113,7 @@ const App: React.FC = () => {
         // WooCommerce Stripe plugin will handle payment processing server-side
         const order = await api.createOrder({
           billing: billing,
+          shipping: shipSame ? undefined : shipping,
           line_items: cart.map(item => ({
             product_id: item.id,
             quantity: item.quantity,
@@ -1010,9 +1157,19 @@ const App: React.FC = () => {
         handleNavigate('thank-you');
       } catch (error) {
         console.error("Order creation failed:", error);
+        if ((error as any)?.code === 'out_of_stock') {
+          setOrderError((error as Error).message);
+          showToast((error as Error).message);
+          revalidateCartStock();
+          return;
+        }
+        if ((error as any)?.code === 'bad_address') {
+          setOrderError((error as Error).message);
+          showToast((error as Error).message);
+          return;
+        }
         setOrderError('Failed to place order. Please try again.');
-        setToast({ message: "Failed to place order. Please try again.", visible: true });
-        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+        showToast("Failed to place order. Please try again.");
       } finally {
         setPlacingOrder(false);
       }
@@ -1025,116 +1182,7 @@ const App: React.FC = () => {
           <div className="flex-1">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Billing Details</h2>
             <form id="checkout-form" onSubmit={handlePlaceOrder} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">First Name *</label>
-                  <input
-                    type="text"
-                    name="first_name"
-                    value={billing.first_name}
-                    onChange={handleBillingChange}
-                    required
-                    className="w-full border p-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Last Name *</label>
-                  <input
-                    type="text"
-                    name="last_name"
-                    value={billing.last_name}
-                    onChange={handleBillingChange}
-                    required
-                    className="w-full border p-2 text-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Company Name</label>
-                <input
-                  type="text"
-                  name="company"
-                  value={billing.company}
-                  onChange={handleBillingChange}
-                  className="w-full border p-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Street Address *</label>
-                <input
-                  type="text"
-                  name="address_1"
-                  value={billing.address_1}
-                  onChange={handleBillingChange}
-                  required
-                  className="w-full border p-2 text-sm"
-                  placeholder="House number and street name"
-                />
-              </div>
-              <div>
-                <input
-                  type="text"
-                  name="address_2"
-                  value={billing.address_2}
-                  onChange={handleBillingChange}
-                  className="w-full border p-2 text-sm"
-                  placeholder="Apartment, suite, landmark (optional)"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Town / City *</label>
-                <input
-                  type="text"
-                  name="city"
-                  value={billing.city}
-                  onChange={handleBillingChange}
-                  required
-                  className="w-full border p-2 text-sm"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">State *</label>
-                  <input
-                    type="text"
-                    name="state"
-                    value={billing.state}
-                    onChange={handleBillingChange}
-                    required
-                    className="w-full border p-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">PIN / ZIP Code *</label>
-                  <input
-                    type="text"
-                    name="postcode"
-                    value={billing.postcode}
-                    onChange={handleBillingChange}
-                    required
-                    className="w-full border p-2 text-sm"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Country *</label>
-                <select
-                  name="country"
-                  value={billing.country}
-                  onChange={handleBillingChange}
-                  required
-                  className="w-full border p-2 text-sm bg-white"
-                >
-                  <option value="IN">India</option>
-                  <option value="US">United States</option>
-                  <option value="GB">United Kingdom</option>
-                  <option value="CA">Canada</option>
-                  <option value="AU">Australia</option>
-                  <option value="AE">United Arab Emirates</option>
-                  <option value="SG">Singapore</option>
-                  <option value="MY">Malaysia</option>
-                </select>
-              </div>
+              {renderAddressFields(billing, handleBillingChange)}
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Phone *</label>
                 <input
@@ -1160,6 +1208,24 @@ const App: React.FC = () => {
                   className="w-full border p-2 text-sm"
                 />
               </div>
+
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none pt-2">
+                <input
+                  type="checkbox"
+                  checked={shipSame}
+                  onChange={(e) => setShipSame(e.target.checked)}
+                  className="w-4 h-4 accent-[#EE6348]"
+                />
+                Ship to the same address
+              </label>
+
+              {!shipSame && (
+                <div className="space-y-4 border-t border-gray-200 pt-4">
+                  <h2 className="text-lg font-bold text-gray-800">Shipping Address</h2>
+                  {renderAddressFields(shipping, handleShippingChange)}
+                </div>
+              )}
+
               {orderError && <p className="text-red-600 text-sm">{orderError}</p>}
             </form>
           </div>
@@ -1248,10 +1314,19 @@ const App: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex justify-between font-bold text-gray-800 text-lg border-t border-gray-200 pt-4 mb-6">
+              <div className="border-t border-gray-200 pt-4 space-y-1 text-sm text-gray-600">
+                <div className="flex justify-between"><span>Subtotal (excl. tax)</span><span>${subtotal.toFixed(2)}</span></div>
+                {discount > 0 && <div className="flex justify-between text-green-700"><span>Discount</span><span>-${discount.toFixed(2)}</span></div>}
+                <div className="flex justify-between">
+                  <span>{salesTax > 0 ? TAX_LABEL : 'Sales tax'}</span>
+                  <span>{salesTax > 0 ? `$${salesTax.toFixed(2)}` : '$0.00'}</span>
+                </div>
+              </div>
+              <div className="flex justify-between font-bold text-gray-800 text-lg border-t border-gray-200 pt-4 mt-3 mb-1">
                 <span>Total</span>
                 <span className="text-[#EE6348]">${total.toFixed(2)}</span>
               </div>
+              <p className="text-[11px] text-gray-400 mb-6">Prices exclude tax. {TAX_RATE_PERCENT}% sales tax applies to deliveries within California only (based on the shipping address).</p>
               <button
                 type="submit"
                 form="checkout-form"
@@ -1305,8 +1380,8 @@ const App: React.FC = () => {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <Check size={40} className="text-green-600" />
           </div>
-          <h1 className="text-3xl font-bold uppercase font-heading text-gray-800 mb-4">Thank You!</h1>
-          <p className="text-lg text-gray-600 mb-2">Your order has been placed successfully.</p>
+          <h1 className="text-3xl font-bold uppercase font-heading text-gray-800 mb-4">{lastOrderId ? 'Thank You!' : 'No recent order'}</h1>
+          <p className="text-lg text-gray-600 mb-2">{lastOrderId ? 'Your order has been placed successfully.' : 'We could not find an order from this visit. You can look one up with Track Order.'}</p>
           {lastOrderId && (
             <p className="text-sm text-gray-500 mb-8">Order ID: <span className="font-bold text-[#EE6348]">#{lastOrderId}</span></p>
           )}
@@ -1332,7 +1407,21 @@ const App: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                <div className="border-t border-gray-200 mt-4 pt-4 flex justify-between font-bold text-gray-800">
+                <div className="border-t border-gray-200 mt-4 pt-4 space-y-1 text-sm text-gray-600">
+                  <div className="flex justify-between"><span>Subtotal (excl. tax)</span><span>${orderDetails.subtotal}</span></div>
+                  {parseFloat(orderDetails.discount_total || '0') > 0 && (
+                    <div className="flex justify-between text-green-700"><span>Discount</span><span>-${orderDetails.discount_total}</span></div>
+                  )}
+                  {parseFloat(orderDetails.shipping_total || '0') > 0 && (
+                    <div className="flex justify-between"><span>Shipping</span><span>${orderDetails.shipping_total}</span></div>
+                  )}
+                  {(orderDetails.tax_lines && orderDetails.tax_lines.length > 0)
+                    ? orderDetails.tax_lines.map((t, i) => (
+                        <div key={i} className="flex justify-between"><span>{t.label}</span><span>${parseFloat(t.amount).toFixed(2)}</span></div>
+                      ))
+                    : <div className="flex justify-between"><span>Sales tax</span><span>$0.00</span></div>}
+                </div>
+                <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between font-bold text-gray-800">
                   <span>Total</span>
                   <span className="text-[#EE6348]">${orderDetails.total}</span>
                 </div>
@@ -1361,6 +1450,7 @@ const App: React.FC = () => {
             </div>
           )}
 
+          {lastOrderId && (
           <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-8">
             <h3 className="font-bold text-gray-800 mb-2">What happens next?</h3>
             <ul className="text-sm text-gray-600 space-y-2 text-left">
@@ -1378,6 +1468,7 @@ const App: React.FC = () => {
               </li>
             </ul>
           </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
@@ -1461,12 +1552,26 @@ const App: React.FC = () => {
     useEffect(() => {
       if (accountTab === 'addresses' && user?.email) {
         setLoadingAddresses(true);
-        api.getCustomerByEmail(user.email).then(setCustomerAddresses).finally(() => setLoadingAddresses(false));
+        (async () => {
+          const profile = await api.getCustomerByEmail(user.email);
+          const hasAddress = Boolean(profile?.billing?.address_1 || profile?.shipping?.address_1);
+          if (hasAddress) { setCustomerAddresses(profile); return; }
+
+          // No saved profile address: fall back to the address on the latest order.
+          const orders = await api.getOrders(user.email);
+          const latest = orders.find(o => o.billing?.address_1 || o.shipping?.address_1);
+          if (!latest) { setCustomerAddresses(profile); return; }
+          const blank = { first_name: '', last_name: '', company: '', address_1: '', address_2: '', city: '', state: '', postcode: '', country: '' };
+          setCustomerAddresses({
+            billing: { ...blank, email: user.email, phone: '', ...(profile?.billing || {}), ...(latest.billing?.address_1 ? latest.billing : latest.shipping) } as any,
+            shipping: { ...blank, ...(profile?.shipping || {}), ...(latest.shipping?.address_1 ? latest.shipping : latest.billing) } as any,
+          });
+        })().finally(() => setLoadingAddresses(false));
       }
     }, [accountTab, user?.email]);
 
     const handleEditAddress = (addressType: 'billing' | 'shipping') => {
-      const existingAddress = customerAddresses?.[addressType] || {};
+      const existingAddress: Record<string, string> = (customerAddresses?.[addressType] as Record<string, string> | undefined) || {};
       setAddressForm({
         first_name: existingAddress.first_name || '',
         last_name: existingAddress.last_name || '',
@@ -2298,7 +2403,7 @@ const App: React.FC = () => {
             <div className="w-12 h-0.5 bg-[#EE6348] mx-auto mt-4"></div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {categories.filter(c => !c.parent).map(cat => (
+            {categories.filter(c => !c.parent && ((c.count ?? 1) > 0 || categories.some(ch => ch.parent === c.id && (ch.count ?? 1) > 0))).map(cat => (
               <div key={cat.id} className="relative group overflow-hidden cursor-pointer aspect-square" onClick={() => handleNavigate('shop', cat.name)}>
                 {/* Image */}
                 <img
@@ -2549,7 +2654,7 @@ const App: React.FC = () => {
     // category, or top-level categories when the shop page has no category selected.
     const filterCategories = useMemo(() => {
       if (subcategories.length > 0) return subcategories;
-      return categories.filter(c => !c.parent);
+      return categories.filter(c => !c.parent && (c.count ?? 1) > 0);
     }, [categories, subcategories]);
 
     // Calculate dynamic price range from category products
@@ -2585,9 +2690,10 @@ const App: React.FC = () => {
         .filter(attr => attrMap.has(attr.name))
         .map(attr => ({
           ...attr,
-          terms: attr.terms?.filter((term: any) => 
-            attrMap.get(attr.name)?.has(term.name)
-          ) || []
+          terms: sortSizeOptions(
+            attr.terms?.filter((term: any) => attrMap.get(attr.name)?.has(term.name)) || [],
+            (term: any) => term.name
+          )
         }))
         .filter(attr => attr.terms.length > 0);
     }, [categoryProducts, productAttributes]);
@@ -2609,6 +2715,71 @@ const App: React.FC = () => {
       );
     }, [currentCategory, availablePriceRange.min, availablePriceRange.max]);
 
+    // --- Size filter must only show products where that size is IN STOCK ---------------
+    // The product list does not include per-size stock, so variations are loaded (once, cached)
+    // for the variable products that match the chosen attributes.
+    const hasAttrFilter = Object.values(selectedFilterAttributes).some(t => (t as string[]).length > 0);
+    const slug = (v: string) => v.toLowerCase().replace(/\s+/g, '-');
+    const matchesSelectedAttrs = (p: Product) =>
+      Object.entries(selectedFilterAttributes).every(([attrName, selectedTerms]) => {
+        const terms = selectedTerms as string[];
+        if (terms.length === 0) return true;
+        const productAttr = p.attributes.find(pa => pa.name === attrName);
+        return !!productAttr && productAttr.options.some(opt => terms.includes(slug(opt)));
+      });
+    const needsStockCheck = (p: Product) => hasAttrFilter && !showOutOfStock && p.type === 'variable';
+
+    const [stockTick, setStockTick] = useState(0);
+    const [checkingStock, setCheckingStock] = useState(false);
+    useEffect(() => {
+      if (!hasAttrFilter || showOutOfStock) return;
+      const todo = categoryProducts.filter(p => needsStockCheck(p) && matchesSelectedAttrs(p) && !(p.id in variationStockCache.current));
+      if (todo.length === 0) return;
+      let cancelled = false;
+      setCheckingStock(true);
+      (async () => {
+        const queue = [...todo];
+        const worker = async () => {
+          while (queue.length && !cancelled) {
+            const p = queue.shift()!;
+            try {
+              const vars = await api.getProductVariations(p.id);
+              variationStockCache.current[p.id] = vars.length > 0 ? vars : null; // none returned = lookup failed
+            } catch {
+              variationStockCache.current[p.id] = null;
+            }
+          }
+        };
+        await Promise.all(Array.from({ length: 5 }, worker));
+        if (!cancelled) { setCheckingStock(false); setStockTick(t => t + 1); }
+      })();
+      return () => { cancelled = true; setCheckingStock(false); };
+    }, [selectedFilterAttributes, showOutOfStock, categoryProducts]);
+
+    // True from the very first render after a size is picked (before the effect starts), so the
+    // page never flashes "0 products" while stock is being checked.
+    const stockPending = checkingStock || (hasAttrFilter && !showOutOfStock &&
+      categoryProducts.some(p => needsStockCheck(p) && matchesSelectedAttrs(p) && !(p.id in variationStockCache.current)));
+
+    // Is there an in-stock variation matching ALL the selected options (e.g. size L)?
+    const hasMatchingInStockVariation = (p: Product): boolean => {
+      const vars = variationStockCache.current[p.id];
+      if (vars === undefined) return false;   // still loading: hide until we know
+      if (vars === null) return true;         // lookup failed: don't hide a product by mistake
+      return vars.some(v => {
+        if (v.stock_status === 'outofstock') return false;
+        if (v.manage_stock && v.stock_quantity != null) { if (v.stock_quantity <= 0) return false; }
+        else if (p.manage_stock && p.stock_quantity != null && p.stock_quantity <= 0) return false; // stock kept on the parent
+        return Object.entries(selectedFilterAttributes).every(([attrName, selectedTerms]) => {
+          const terms = selectedTerms as string[];
+          if (terms.length === 0) return true;
+          const va = v.attributes.find(a => a.name === attrName);
+          if (!va || !va.option) return true;  // variation is "any" for this attribute
+          return terms.includes(slug(va.option));
+        });
+      });
+    };
+
     const filteredProducts = useMemo(() => {
       return categoryProducts
         .filter(p => {
@@ -2622,6 +2793,7 @@ const App: React.FC = () => {
             return productAttr.options.some(opt => terms.includes(opt.toLowerCase().replace(/\s+/g, '-')));
           });
           if (!hasSelectedAttributes) return false;
+          if (needsStockCheck(p) && !hasMatchingInStockVariation(p)) return false;
           return true;
         })
         .sort((a, b) => {
@@ -2635,7 +2807,7 @@ const App: React.FC = () => {
             default: return new Date(b.date_created || 0).getTime() - new Date(a.date_created || 0).getTime();
           }
         });
-    }, [categoryProducts, priceRange, selectedFilterAttributes, sortBy, showOutOfStock]);
+    }, [categoryProducts, priceRange, selectedFilterAttributes, sortBy, showOutOfStock, stockTick]);
 
     filteredLengthRef.current = filteredProducts.length;
 
@@ -2682,7 +2854,7 @@ const App: React.FC = () => {
 
         <div className="mb-8 bg-gray-100 py-12 px-6 text-center border-b-4 border-[#EE6348]">
           <h1 className="text-4xl font-bold uppercase font-heading text-gray-800 tracking-wider">{currentCategory || "All Products"}</h1>
-          <p className="text-gray-500 mt-2 text-sm uppercase tracking-widest">Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}</p>
+          <p className="text-gray-500 mt-2 text-sm uppercase tracking-widest">{stockPending ? 'Checking availability…' : <>Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}</>}</p>
         </div>
 
         {/* Filters and Sort in one line */}
@@ -2899,7 +3071,7 @@ const App: React.FC = () => {
                   <div key={attr.id} className="flex flex-col">
                     <label className="text-sm font-bold text-gray-700 mb-2">{attr.name}:</label>
                     <div className="flex flex-wrap gap-2">
-                      {attr.options.map((opt, i) => {
+                      {sortSizeOptions(attr.options).map((opt, i) => {
                         const isSelected = selectedAttributes[attr.name] === opt;
                         return (
                           <button
@@ -3016,7 +3188,17 @@ const App: React.FC = () => {
     );
   };
 
-  const WishlistView = () => (
+  const WishlistView = () => {
+    // "Add to cart" from the wishlist: items with options (sizes) need the product page.
+    const moveToCart = (item: Product) => {
+      if (item.type === 'variable') { handleProductClick(item.id); showToast('Select your options first'); return; }
+      if (addToCart(item)) removeFromWishlist(item.id);
+    };
+    const isSoldOut = (item: Product) =>
+      item.stock_status === 'outofstock' || (!!item.manage_stock && item.stock_quantity === 0);
+    const actionLabel = (item: Product) => item.type === 'variable' ? 'Select Options' : 'Add to Cart';
+
+    return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold uppercase font-heading text-gray-800 mb-8 border-b pb-4">My Wishlist</h1>
 
@@ -3028,8 +3210,52 @@ const App: React.FC = () => {
         </div>
       ) : (
         <div className="flex flex-col gap-8">
-          <div className="w-full overflow-x-auto">
-            <table className="w-full border-collapse bg-white shadow-sm min-w-[600px] hidden md:table">
+          {/* Mobile: one card per product */}
+          <ul className="md:hidden space-y-3">
+            {wishlist.map(item => (
+              <li key={item.id} className="flex gap-3 bg-white border border-gray-200 p-3 shadow-sm">
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  className="w-20 h-24 object-contain bg-gray-50 flex-shrink-0 cursor-pointer"
+                  onClick={() => handleProductClick(item.id)}
+                />
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <span
+                    className="text-[#EE6348] text-sm font-bold cursor-pointer leading-snug line-clamp-2"
+                    onClick={() => handleProductClick(item.id)}
+                  >
+                    {item.name}
+                  </span>
+                  <span className="text-sm text-gray-700 font-bold mt-1">${item.price.toFixed(2)}</span>
+                  <span className={`text-xs font-bold mt-0.5 ${isSoldOut(item) ? 'text-red-500' : 'text-green-600'}`}>
+                    {isSoldOut(item) ? 'Out of Stock' : 'In Stock'}
+                  </span>
+                  <div className="flex items-center gap-2 mt-auto pt-2">
+                    <button
+                      onClick={() => moveToCart(item)}
+                      disabled={isSoldOut(item)}
+                      className="flex-1 bg-[#EE6348] text-white px-3 py-2 text-xs font-bold uppercase hover:bg-black transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {actionLabel(item)}
+                    </button>
+                    <button
+                      onClick={() => toggleWishlist(item)}
+                      className="bg-gray-200 text-gray-600 p-2 hover:bg-gray-300 transition"
+                      title="Remove"
+                      aria-label={`Remove ${item.name} from wishlist`}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {/* Desktop / tablet: table */}
+          <div className="w-full overflow-x-auto hidden md:block">
+            <table className="w-full border-collapse bg-white shadow-sm min-w-[600px]">
               <thead>
                 <tr className="bg-gray-100 text-left text-xs font-bold uppercase text-gray-600">
                   <th className="p-4">Image</th>
@@ -3051,14 +3277,15 @@ const App: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-4 text-sm text-gray-600">${item.price.toFixed(2)}</td>
-                    <td className="p-4 text-sm text-green-600 font-bold">In Stock</td>
+                    <td className={`p-4 text-sm font-bold ${isSoldOut(item) ? 'text-red-500' : 'text-green-600'}`}>{isSoldOut(item) ? 'Out of Stock' : 'In Stock'}</td>
                     <td className="p-4">
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => { addToCart(item); toggleWishlist(item); }}
-                          className="bg-[#EE6348] text-white px-4 py-2 text-xs font-bold uppercase hover:bg-black transition"
+                          onClick={() => moveToCart(item)}
+                          disabled={isSoldOut(item)}
+                          className="bg-[#EE6348] text-white px-4 py-2 text-xs font-bold uppercase hover:bg-black transition disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          Add to Cart
+                          {actionLabel(item)}
                         </button>
                         <button
                           onClick={() => toggleWishlist(item)}
@@ -3077,7 +3304,8 @@ const App: React.FC = () => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   const CartView = () => (
     <div className="container mx-auto px-4 py-8">
@@ -3216,16 +3444,17 @@ const App: React.FC = () => {
 
           <div className="w-full lg:w-1/3 space-y-6">
             <div className="bg-gray-50 p-6 border shadow-sm">
-              <div className="flex justify-between mb-6 text-lg font-bold text-[#EE6348]">
-                <span>Total:</span>
+              <div className="flex justify-between text-lg font-bold text-[#EE6348]">
+                <span>Subtotal:</span>
                 <span>${cart.reduce((acc, item) => acc + (item.price * item.quantity), 0).toFixed(2)}</span>
               </div>
+              <p className="text-[11px] text-gray-400 mt-1 mb-6">Excludes tax. Sales tax is calculated at checkout from your delivery state.</p>
+              {/* Goes through the checkout form (not express) so the delivery state is known for sales tax. */}
               <button
-                onClick={handleExpressCheckout}
-                disabled={expressLoading}
-                className="w-full bg-[#EE6348] text-white font-bold uppercase py-3 hover:bg-black transition rounded-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                onClick={() => handleNavigate('checkout')}
+                className="w-full bg-[#EE6348] text-white font-bold uppercase py-3 hover:bg-black transition rounded-sm flex items-center justify-center gap-2"
               >
-                {expressLoading ? <><Loader2 size={18} className="animate-spin" /> Redirecting…</> : 'Checkout'}
+                Checkout
               </button>
             </div>
           </div>
@@ -3511,15 +3740,6 @@ const App: React.FC = () => {
     );
   };
 
-  const Toast = ({ message, visible }: { message: string, visible: boolean }) => {
-    if (!visible) return null;
-    return (
-      <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-4 rounded shadow-2xl z-[100] animate-fade-in-down flex items-center max-w-sm">
-        <Check size={20} className="mr-3 flex-shrink-0" />
-        <span className="text-sm font-semibold">{message}</span>
-      </div>
-    );
-  };
 
   if (loading) {
     return (
@@ -3726,6 +3946,15 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1 bg-white">
+        {loadError && products.length === 0 && (
+          <div className="container mx-auto px-4 py-10 text-center">
+            <p className="text-gray-700 font-bold mb-1">We couldn't load our products.</p>
+            <p className="text-gray-500 text-sm mb-4">Please check your connection and try again.</p>
+            <button onClick={() => setDataKey(k => k + 1)} className="bg-[#EE6348] text-white font-bold uppercase px-8 py-3 text-sm hover:bg-black transition">
+              Retry
+            </button>
+          </div>
+        )}
         {view === 'home' && <StableView render={HomeView} />}
         {view === 'shop' && <StableView render={ShopView} />}
         {view === 'categories' && <CategoriesView />}
@@ -3735,7 +3964,7 @@ const App: React.FC = () => {
         {view === 'wishlist' && <WishlistView />}
         {view === 'checkout' && <StableView render={CheckoutView} />}
         {view === 'register' && <StableView render={RegisterView} />}
-        {view === 'account' && <StableView render={AccountView} />}
+        {view === 'account' && (user ? <StableView render={AccountView} /> : <StableView render={RegisterView} />)}
         {view === 'page' && <StableView render={PageView} />}
         {view === 'track-order' && <StableView render={TrackOrderView} />}
         {view === 'rent' && <StableView render={RentMeView} />}

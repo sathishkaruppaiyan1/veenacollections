@@ -131,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
       `}</style>
       <div className="bg-[#B8A99A] text-white text-xs font-bold py-1.5 border-b border-[#A39486] overflow-hidden">
         <div className="container mx-auto px-4 flex justify-center items-center">
-          <button onClick={prevAnnouncement} className="hover:text-gray-200 transition p-1" aria-label="Previous announcement">
+          <button onClick={prevAnnouncement} className="hover:text-gray-200 transition p-2" aria-label="Previous announcement">
             <ChevronLeft size={16} />
           </button>
           <div className="w-64 text-center overflow-hidden">
@@ -139,7 +139,7 @@ export const Header: React.FC<HeaderProps> = ({
               {announcements[currentAnnouncementIndex]}
             </div>
           </div>
-          <button onClick={nextAnnouncement} className="hover:text-gray-200 transition p-1" aria-label="Next announcement">
+          <button onClick={nextAnnouncement} className="hover:text-gray-200 transition p-2" aria-label="Next announcement">
             <ChevronRight size={16} />
           </button>
         </div>
@@ -147,31 +147,31 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Top Bar */}
       <div className="bg-[#0b141b] text-gray-400 text-sm py-2.5 border-b border-gray-800">
         <div className="container mx-auto px-4 flex justify-end items-center">
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-1 sm:space-x-6">
             {isLoggedIn && userFirstName && (
               <button
                 onClick={() => onNavigate('account', 'dashboard')}
-                className="flex items-center hover:text-white transition"
+                className="flex items-center hover:text-white transition p-2.5 sm:p-0"
               >
                 <span className="hidden sm:inline">Hello {userFirstName}</span>
               </button>
             )}
             <button
               onClick={() => onNavigate('track-order')}
-              className="flex items-center hover:text-white transition"
+              className="flex items-center hover:text-white transition p-2.5 sm:p-0"
             >
               <Truck size={18} className="mr-1.5" />
               <span className="hidden sm:inline">Track Your Order</span>
             </button>
             {isLoggedIn && (
-              <button onClick={() => onNavigate('account', 'dashboard')} className="flex items-center hover:text-white transition">
+              <button onClick={() => onNavigate('account', 'dashboard')} className="flex items-center hover:text-white transition p-2.5 sm:p-0">
                 <UserCircle2 size={18} className="mr-1.5" />
                 <span className="hidden sm:inline">My Account</span>
               </button>
             )}
             <button
               onClick={() => onNavigate('wishlist')}
-              className="flex items-center hover:text-white transition group"
+              className="flex items-center hover:text-white transition group p-2.5 sm:p-0"
             >
               <div className="relative mr-1.5">
                 <Heart size={18} />
@@ -186,7 +186,7 @@ export const Header: React.FC<HeaderProps> = ({
             {!isLoggedIn && (
               <button
                 onClick={() => onNavigate('register')}
-                className="flex items-center hover:text-white transition"
+                className="flex items-center hover:text-white transition p-2.5 sm:p-0"
               >
                 <UserCircle2 size={18} className="mr-1.5" />
                 <span className="hidden sm:inline">Log in</span>
@@ -194,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
             <button
               onClick={() => onNavigate('cart')}
-              className="flex items-center text-[#EE6348] font-bold hover:text-white transition group"
+              className="flex items-center text-[#EE6348] font-bold hover:text-white transition group p-2.5 sm:p-0"
             >
               <div className="relative mr-1.5">
                 <ShoppingCart size={18} className="text-white" />
@@ -368,7 +368,8 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="font-bold text-lg uppercase tracking-wider font-heading">Menu</span>
           <button
             onClick={() => setIsMenuOpen(false)}
-            className="text-gray-400 hover:text-[#EE6348] transition"
+            className="text-gray-400 hover:text-[#EE6348] transition p-2 -m-2"
+            aria-label="Close menu"
           >
             <X size={24} />
           </button>

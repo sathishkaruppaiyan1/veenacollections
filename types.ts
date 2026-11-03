@@ -126,6 +126,7 @@ export interface Order {
   shipping_total?: string;
   discount_total?: string;
   total_tax?: string;
+  tax_lines?: Array<{ label: string; amount: string; rate?: number }>;
   line_items: OrderLineItem[];
   billing?: OrderAddress;
   shipping?: OrderAddress;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShoppingCart, Star } from 'lucide-react';
 import { Product, Variation } from '../types';
 import { api } from '../api';
+import { sortSizeOptions } from '../sizeOrder';
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -110,7 +111,7 @@ export const QuickViewModal: React.FC<QuickViewModalProps> = ({ product, isOpen,
                   <div key={attr.id} className="flex flex-col">
                     <label className="text-sm font-bold text-gray-700 mb-2">{attr.name}</label>
                     <div className="flex flex-wrap gap-2">
-                      {attr.options.map((opt, i) => {
+                      {sortSizeOptions(attr.options).map((opt, i) => {
                         const isSelected = selectedAttributes[attr.name] === opt;
                         return (
                           <button
