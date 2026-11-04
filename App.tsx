@@ -2736,13 +2736,15 @@ const App: React.FC = () => {
     // The product list does not include per-size stock, so variations are loaded (once, cached)
     // for the variable products that match the chosen attributes.
     const hasAttrFilter = Object.values(selectedFilterAttributes).some(t => (t as string[]).length > 0);
-    const slug = (v: string) => v.toLowerCase().replace(/\s+/g, '-');
+    // WooCommerce turns a term like "2.6" into the slug "2-6", while products list it as "2.6",
+    // so both sides are normalised the same way before comparing.
+    const slug = (v: string) => v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     const matchesSelectedAttrs = (p: Product) =>
       Object.entries(selectedFilterAttributes).every(([attrName, selectedTerms]) => {
         const terms = selectedTerms as string[];
         if (terms.length === 0) return true;
         const productAttr = p.attributes.find(pa => pa.name === attrName);
-        return !!productAttr && productAttr.options.some(opt => terms.includes(slug(opt)));
+        return !!productAttr && productAttr.options.some(opt => terms.map(slug).includes(slug(opt)));
       });
     const needsStockCheck = (p: Product) => hasAttrFilter && !showOutOfStock && p.type === 'variable';
 
@@ -2792,7 +2794,7 @@ const App: React.FC = () => {
           if (terms.length === 0) return true;
           const va = v.attributes.find(a => a.name === attrName);
           if (!va || !va.option) return true;  // variation is "any" for this attribute
-          return terms.includes(slug(va.option));
+          return terms.map(slug).includes(slug(va.option));
         });
       });
     };
@@ -2807,7 +2809,7 @@ const App: React.FC = () => {
             if (terms.length === 0) return true;
             const productAttr = p.attributes.find(pa => pa.name === attrName);
             if (!productAttr) return false;
-            return productAttr.options.some(opt => terms.includes(opt.toLowerCase().replace(/\s+/g, '-')));
+            return productAttr.options.some(opt => terms.map(slug).includes(slug(opt)));
           });
           if (!hasSelectedAttributes) return false;
           if (needsStockCheck(p) && !hasMatchingInStockVariation(p)) return false;

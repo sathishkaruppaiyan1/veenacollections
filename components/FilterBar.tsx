@@ -157,30 +157,20 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                                     <span>${priceRange[0]}</span>
                                     <span>${priceRange[1]}</span>
                                 </div>
-                                <div className="space-y-3">
+                                {maxPrice > minPrice && (
                                     <label className="block text-[11px] uppercase tracking-wider text-gray-400">
-                                        Min
+                                        Maximum price (lowest ${minPrice}, highest ${maxPrice})
                                         <input
                                             type="range"
                                             min={minPrice}
                                             max={maxPrice}
-                                            value={priceRange[0]}
-                                            onChange={(e) => setPriceRange([Math.min(parseInt(e.target.value), priceRange[1]), priceRange[1]])}
-                                            className="w-full accent-[#EE6348] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                        />
-                                    </label>
-                                    <label className="block text-[11px] uppercase tracking-wider text-gray-400">
-                                        Max
-                                        <input
-                                            type="range"
-                                            min={minPrice}
-                                            max={maxPrice}
+                                            step={1}
                                             value={priceRange[1]}
-                                            onChange={(e) => setPriceRange([priceRange[0], Math.max(parseInt(e.target.value), priceRange[0])])}
-                                            className="w-full accent-[#EE6348] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                            onChange={(e) => setPriceRange([minPrice, parseInt(e.target.value)])}
+                                            className="w-full mt-2 accent-[#EE6348] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                                         />
                                     </label>
-                                </div>
+                                )}
                                 <div className="flex flex-wrap gap-2 mt-4">
                                     {buildPriceBuckets(minPrice, maxPrice).map(bucket => {
                                         const active = priceRange[0] === bucket.range[0] && priceRange[1] === bucket.range[1];
