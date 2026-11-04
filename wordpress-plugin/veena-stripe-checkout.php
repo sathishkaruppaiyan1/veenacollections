@@ -55,6 +55,18 @@ add_action('admin_notices', function () {
     }
 });
 
+// wp_safe_redirect() only allows this WordPress domain and otherwise falls back to wp-admin.
+// The storefront lives on another domain, so allow its host for our return/cancel redirects.
+add_filter('allowed_redirect_hosts', function ($hosts) {
+    $host = wp_parse_url(VEENA_STOREFRONT_URL, PHP_URL_HOST);
+    if ($host) {
+        $hosts[] = $host;
+        $hosts[] = preg_replace('/^www\./', '', $host);
+        $hosts[] = 'www.' . preg_replace('/^www\./', '', $host);
+    }
+    return $hosts;
+});
+
 add_action('rest_api_init', function () {
     register_rest_route('veena-stripe/v1', '/session', [
         'methods'             => 'POST',
@@ -339,7 +351,7 @@ function veena_stripe_customer($order) {
     // Delivery address (falls back to billing when the store form had no separate one).
     $ship_name = trim($order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name());
     $set('shipping[name]', $ship_name ?: ($c['name'] ?? ''));
-    $set('shipping[phone]', $order->get_billing_phone());
+    $set('shipping[phone]', $order->get_shipping_phone() ?: $order->get_billing_phone());
     $set('shipping[address][line1]', $order->get_shipping_address_1() ?: $order->get_billing_address_1());
     $set('shipping[address][line2]', $order->get_shipping_address_2());
     $set('shipping[address][city]', $order->get_shipping_city() ?: $order->get_billing_city());
@@ -351,6 +363,24 @@ function veena_stripe_customer($order) {
     $res = veena_stripe_api('customers', $c, 'POST');
     return !empty($res['id']) ? $res['id'] : '';
 }
+
+/**
+ * WooCommerce prints the shipping address in emails/invoices only when the order has a shipping
+ * method line. Orders from the storefront have none, so the address was left out. Treat any
+ * order that has a delivery address and went through Stripe checkout as needing one.
+ */
+add_filter('woocommerce_order_needs_shipping_address', function ($needs, $hide, $order) {
+    if ($needs || !$order) return $needs;
+    return $order->get_shipping_address_1() !== '' && $order->get_meta('_veena_stripe_session') !== '';
+}, 10, 3);
+
+/** wp-admin: show the delivery contact email (WooCommerce has no shipping-email field) under the shipping address. */
+add_action('woocommerce_admin_order_data_after_shipping_address', function ($order) {
+    $email = $order->get_meta('_shipping_email');
+    if ($email) {
+        echo '<p><strong>' . esc_html__('Shipping email', 'woocommerce') . ':</strong> <a href="mailto:' . esc_attr($email) . '">' . esc_html($email) . '</a></p>';
+    }
+});
 
 /** Everything needed to ship: street, city, country (and phone for contact). Returns an error or ''. */
 function veena_address_error($order) {
@@ -601,7 +631,7 @@ function veena_stripe_return(WP_REST_Request $req) {
     // Only trust a session that belongs to this order.
     if ($order && $session && ($session['client_reference_id'] ?? '') === (string) $order_id
         && veena_finalize_order($order, $session)) {
-        wp_safe_redirect(VEENA_STOREFRONT_URL . '/?view=thank-you&order_paid=' . $order_id);
+        wp_safe_redirect(VEENA_STOREFRONT_URL . '/?view=thank-you&order_paid=' . $order_id . '&order_key=' . rawurlencode($order->get_order_key()));
         exit;
     }
 

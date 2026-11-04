@@ -267,8 +267,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, isO
                   <div className="min-w-0">
                     <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Delivery address</p>
                     <p className="text-sm text-gray-700 leading-relaxed mt-1">{shipTo.join(', ')}</p>
-                    {order.billing?.phone && <p className="text-xs text-gray-500 mt-1">{order.billing.phone}</p>}
-                    {order.billing?.email && <p className="text-xs text-gray-500 break-all">{order.billing.email}</p>}
+                    {(order.shipping?.phone || order.billing?.phone) && <p className="text-xs text-gray-500 mt-1">{order.shipping?.phone || order.billing?.phone}</p>}
+                    {(order.shipping?.email || order.billing?.email) && <p className="text-xs text-gray-500 break-all">{order.shipping?.email || order.billing?.email}</p>}
                   </div>
                 </div>
               )}
@@ -280,6 +280,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ order, isO
                   <div className="min-w-0">
                     <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Billing address</p>
                     <p className="text-sm text-gray-700 leading-relaxed mt-1">{billTo.join(', ')}</p>
+                    {order.billing?.phone && <p className="text-xs text-gray-500 mt-1">{order.billing.phone}</p>}
+                    {order.billing?.email && <p className="text-xs text-gray-500 break-all">{order.billing.email}</p>}
                   </div>
                 </div>
               )}

@@ -172,6 +172,7 @@ let isCaching = false;
 // Map a raw WooCommerce order into our Order shape (with line item images + totals)
 const mapOrder = (o: any): Order => ({
   id: o.id,
+  order_key: o.order_key,
   number: o.number ? String(o.number) : String(o.id),
   status: o.status,
   date_created: o.date_created,
@@ -210,7 +211,10 @@ const mapOrder = (o: any): Order => ({
       .filter((m: any) => m.value)
   })),
   billing: o.billing || undefined,
-  shipping: o.shipping || undefined,
+  // shipping has its own phone; the shipping email has no WooCommerce field, so it is kept as order meta
+  shipping: o.shipping
+    ? { ...o.shipping, email: (o.meta_data || []).find((m: any) => m.key === '_shipping_email')?.value || undefined }
+    : undefined,
   payment_method_title: o.payment_method_title || undefined,
   shipping_method: (o.shipping_lines || [])[0]?.method_title || undefined,
   customer_note: o.customer_note || undefined
@@ -1203,6 +1207,8 @@ export const api = {
       state?: string;
       postcode?: string;
       country?: string;
+      phone?: string;
+      email?: string;
     };
     payment_method: string;
     payment_method_title: string;
@@ -1232,9 +1238,13 @@ export const api = {
           ...orderData,
           billing: cleanBilling,
           // Deliver to the separate shipping address if given, otherwise to the billing address.
+          // Shipping keeps its own phone; its email is stored as order meta (WooCommerce has no field for it).
           shipping: Object.fromEntries(
-            Object.entries(orderData.shipping ?? cleanBilling).filter(([k, v]) => k !== 'email' && k !== 'phone' && v !== '' && v != null)
+            Object.entries(orderData.shipping ?? cleanBilling).filter(([k, v]) => k !== 'email' && v !== '' && v != null)
           ),
+          meta_data: [
+            { key: '_shipping_email', value: (orderData.shipping?.email || orderData.billing.email || '').trim() }
+          ].filter(m => m.value),
           set_paid: false,
           status: isCod ? 'processing' : 'pending'
         }),
@@ -1385,7 +1395,7 @@ export const api = {
   // -----------------------------------------------------------
   // 7h. Get Order by ID (for tracking page)
   // -----------------------------------------------------------
-  getOrderById: async (orderId: number, billingEmail?: string): Promise<Order | null> => {
+  getOrderById: async (orderId: number, billingEmail?: string, orderKey?: string): Promise<Order | null> => {
     try {
       if (WP_CONFIG.SITE_URL.includes('your-wordpress-site.com')) {
         return null;
@@ -1401,6 +1411,12 @@ export const api = {
 
       // Verify email if provided (for security)
       if (billingEmail && order.billing?.email?.toLowerCase() !== billingEmail.toLowerCase()) {
+        return null;
+      }
+
+      // When the caller holds the order's secret key (thank-you page), it must match,
+      // so an order number alone can never reveal someone else's details.
+      if (orderKey !== undefined && order.order_key !== orderKey) {
         return null;
       }
 

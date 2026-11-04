@@ -885,6 +885,7 @@ const App: React.FC = () => {
   // --- Views ---
 
   const [lastOrderId, setLastOrderId] = useState<string>('');
+  const [lastOrderKey, setLastOrderKey] = useState<string>('');
   const pendingNoticeRef = useRef('');
 
   // Handle the return from Stripe-hosted Checkout: the WordPress plugin redirects
@@ -894,6 +895,7 @@ const App: React.FC = () => {
     const paidOrderId = params.get('order_paid');
     if (paidOrderId) {
       setLastOrderId(paidOrderId);
+      setLastOrderKey(params.get('order_key') || '');
       setCart([]);
       setView('thank-you');
       // Strip the query params so a refresh doesn't re-trigger this.
@@ -957,7 +959,7 @@ const App: React.FC = () => {
     const [shipSame, setShipSame] = useState(true);
     const [shipping, setShipping] = useState({
       first_name: '', last_name: '', company: '', address_1: '', address_2: '',
-      city: '', state: '', postcode: '', country: 'US'
+      city: '', state: '', postcode: '', country: 'US', phone: '', email: ''
     });
 
     // US states are a fixed list (codes), so changing country clears a state that no longer fits.
@@ -972,8 +974,9 @@ const App: React.FC = () => {
 
     // One set of address fields, used for both billing and shipping.
     const renderAddressFields = (
-      v: { first_name: string; last_name: string; company: string; address_1: string; address_2: string; city: string; state: string; postcode: string; country: string },
-      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void
+      v: { first_name: string; last_name: string; company: string; address_1: string; address_2: string; city: string; state: string; postcode: string; country: string; phone?: string; email?: string },
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void,
+      withContact = false
     ) => (
       <>
         <div className="grid grid-cols-2 gap-4">
@@ -1024,6 +1027,18 @@ const App: React.FC = () => {
             {SHIP_COUNTRIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
           </select>
         </div>
+        {withContact && (
+          <>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Phone *</label>
+              <input type="tel" name="phone" value={v.phone || ''} onChange={onChange} required minLength={7} pattern="[0-9+ \-]{7,}" title="Enter a valid phone number" className="w-full border p-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Email Address *</label>
+              <input type="email" name="email" value={v.email || ''} onChange={onChange} required className="w-full border p-2 text-sm" />
+            </div>
+          </>
+        )}
       </>
     );
 
@@ -1131,6 +1146,7 @@ const App: React.FC = () => {
         // Stripe Direct Checkout plugin marks it paid on return.
         if (selectedPayment !== 'cod') {
           setLastOrderId(order.id.toString());
+          setLastOrderKey(order.order_key);
           const stripeUrl = await api.createStripeCheckoutSession(order.id, order.order_key);
           window.location.href = stripeUrl;
           return;
@@ -1153,6 +1169,7 @@ const App: React.FC = () => {
         });
 
         setLastOrderId(order.id.toString());
+        setLastOrderKey(order.order_key);
         setCart([]);
         handleNavigate('thank-you');
       } catch (error) {
@@ -1222,7 +1239,7 @@ const App: React.FC = () => {
               {!shipSame && (
                 <div className="space-y-4 border-t border-gray-200 pt-4">
                   <h2 className="text-lg font-bold text-gray-800">Shipping Address</h2>
-                  {renderAddressFields(shipping, handleShippingChange)}
+                  {renderAddressFields(shipping, handleShippingChange, true)}
                 </div>
               )}
 
@@ -1352,7 +1369,7 @@ const App: React.FC = () => {
 
       const fetchOrder = async (attempt = 0) => {
         setLoadingOrder(true);
-        const order = await api.getOrderById(Number(lastOrderId));
+        const order = await api.getOrderById(Number(lastOrderId), undefined, lastOrderKey);
         if (cancelled) return;
 
         // The Stripe plugin writes the address onto the order server-side just
@@ -1368,7 +1385,7 @@ const App: React.FC = () => {
 
       fetchOrder();
       return () => { cancelled = true; };
-    }, [lastOrderId]);
+    }, [lastOrderId, lastOrderKey]);
 
     const addr = orderDetails?.shipping?.address_1 ? orderDetails.shipping : orderDetails?.billing;
     const fullName = [addr?.first_name, addr?.last_name].filter(Boolean).join(' ');
@@ -1442,8 +1459,8 @@ const App: React.FC = () => {
                     {addr?.address_2 && <p>{addr.address_2}</p>}
                     <p>{[addr?.city, addr?.state, addr?.postcode].filter(Boolean).join(', ')}</p>
                     {addr?.country && <p>{addr.country}</p>}
-                    {orderDetails.billing?.phone && <p className="mt-1 text-gray-500">{orderDetails.billing.phone}</p>}
-                    {orderDetails.billing?.email && <p className="text-gray-500">{orderDetails.billing.email}</p>}
+                    {(orderDetails.shipping?.phone || orderDetails.billing?.phone) && <p className="mt-1 text-gray-500">{orderDetails.shipping?.phone || orderDetails.billing?.phone}</p>}
+                    {(orderDetails.shipping?.email || orderDetails.billing?.email) && <p className="text-gray-500">{orderDetails.shipping?.email || orderDetails.billing?.email}</p>}
                   </div>
                 </div>
               )}

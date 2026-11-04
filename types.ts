@@ -115,6 +115,7 @@ export interface OrderLineItem {
 
 export interface Order {
   id: number;
+  order_key?: string;
   number?: string;
   status: string;
   date_created: string; // ISO string
